@@ -99,20 +99,20 @@ export const App: React.FC = () => {
 
       {/* 2. AUTHENTICATED APP WORKSPACE (Header + Sidebar + Content) */}
       {!isPublicOrOnboarding && isAuthenticated && (
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Header
             onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
             onOpenSearch={() => setIsSearchOpen(true)}
             onOpenQuickCreate={handleOpenQuickCreate}
           />
 
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 min-h-0 flex overflow-hidden">
             <Sidebar
               isMobileOpen={isMobileSidebarOpen}
               onCloseMobile={() => setIsMobileSidebarOpen(false)}
             />
 
-            <main className="flex-1 overflow-y-auto bg-[#F5F7F9] pb-16">
+            <main className="flex-1 min-w-0 overflow-y-auto bg-[#F5F7F9] pb-16">
               {restrictedView ? <AccessDenied /> : null}
               {!restrictedView && currentView === 'dashboard' && (
                 <DashboardView onOpenQuickCreate={handleOpenQuickCreate} />
@@ -163,4 +163,3 @@ export const App: React.FC = () => {
 };
 
 export default App;
-
