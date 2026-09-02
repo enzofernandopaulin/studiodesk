@@ -1,0 +1,6 @@
+{
+  "name": "StudioDesk - CRM Kanban para Agências Criativas",
+  "description": "CRM + Kanban para agências audiovisuais, produtoras e empresas criativas centralizarem leads, projetos, aprovações, tarefas e comunicação.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
