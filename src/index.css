@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --brand-blue: #66acd7;
+    --brand-blue-dark: #2F6F9C;
+    --brand-dark: #111111;
+    --brand-black: #000000;
+    --brand-bg: #F5F7F9;
+    --brand-border: #DDE3E8;
+    --brand-muted: #6B7280;
+    --brand-purple: #8B5CF6;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.011em;
+    color: #111111;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.022em;
+    font-weight: 700;
+  }
+
+  .font-display {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.025em;
+    font-weight: 800;
+  }
+
+  .font-brand {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+  }
+}
+
+/* Custom scrollbars for Kanban columns, lists and tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+

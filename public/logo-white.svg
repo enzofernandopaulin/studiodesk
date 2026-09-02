@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Paytone+One&amp;family=Anton&amp;display=swap');
+      .logo-main-white {
+        font-family: 'Paytone One', 'Chau Philomene One', sans-serif;
+        font-weight: 900;
+        fill: #FFFFFF;
+      }
+      .logo-tagline-cyan {
+        font-family: 'Anton', sans-serif;
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        fill: #66acd7;
+      }
+    </style>
+  </defs>
+  
+  <g transform="translate(10, 20)">
+    <!-- "Stu" text -->
+    <text x="0" y="52" class="logo-main-white" font-size="52" letter-spacing="-0.03em">Stu</text>
+    
+    <!-- Elongated Tall "D" -->
+    <text x="96" y="76" class="logo-main-white" font-size="82" letter-spacing="-0.05em" transform="scale(1, 1.18) translate(0, -11)">D</text>
+    
+    <!-- "io" -->
+    <text x="162" y="38" class="logo-main-white" font-size="34" letter-spacing="-0.02em">io</text>
+    
+    <!-- "esk" -->
+    <text x="160" y="74" class="logo-main-white" font-size="36" letter-spacing="-0.03em">esk</text>
+    
+    <!-- Accent Dot -->
+    <circle cx="236" cy="30" r="4.5" fill="#66acd7" />
+  </g>
+  
+  <text x="12" y="112" class="logo-tagline-cyan">CRM KANBAN PARA AGÊNCIAS CRIATIVAS</text>
+</svg>
