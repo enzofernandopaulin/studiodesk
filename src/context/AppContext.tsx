@@ -333,9 +333,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!mounted || sequence !== authSequence) return;
       setAuthReady(true);
 
-      // Navegação ocorre apenas ao restaurar a sessão ou após um SIGNED_IN.
-      // Eventos de refresh de token não devem retirar o usuário da tela atual.
-      if (!event || event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
+      // Ao abrir/recarregar o site, mostramos o login mesmo que exista uma
+      // sessão persistida. Um login feito agora continua seguindo ao painel.
+      if (!event || event === 'INITIAL_SESSION') {
+        authDestinationRef.current = null;
+        setCurrentView('auth');
+      } else if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
         const destination = authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard');
         authDestinationRef.current = null;
         setCurrentView(destination);
