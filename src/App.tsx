@@ -104,13 +104,13 @@ export const App: React.FC = () => {
             onOpenQuickCreate={handleOpenQuickCreate}
           />
 
-          <div className="flex-1 min-h-0 flex overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-hidden pt-16">
             <Sidebar
               isMobileOpen={isMobileSidebarOpen}
               onCloseMobile={() => setIsMobileSidebarOpen(false)}
             />
 
-            <main className="flex-1 min-w-0 overflow-y-auto bg-[#F5F7F9] pb-16">
+            <main className="h-full min-w-0 overflow-y-auto bg-[#F5F7F9] pb-16 lg:ml-64">
               {restrictedView ? <AccessDenied /> : null}
               {!restrictedView && currentView === 'dashboard' && (
                 <DashboardView onOpenQuickCreate={handleOpenQuickCreate} />
