@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Check,
   Palette,
+  Sparkles,
   LogOut
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
