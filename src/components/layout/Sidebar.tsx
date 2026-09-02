@@ -82,13 +82,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
       {isMobileOpen && (
         <div
           onClick={onCloseMobile}
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-2xs"
+          className="fixed inset-x-0 bottom-0 top-16 bg-black/50 z-40 lg:hidden backdrop-blur-2xs"
         />
       )}
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static top-0 bottom-0 left-0 z-50 w-64 bg-[#111111] text-white flex flex-col justify-between transition-transform duration-300 ease-in-out border-r border-[#1a1a1a] ${
+        className={`fixed lg:static top-16 bottom-0 left-0 z-50 w-64 shrink-0 bg-[#111111] text-white flex flex-col justify-between transition-transform duration-300 ease-in-out border-r border-[#1a1a1a] ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         id="main-sidebar"
