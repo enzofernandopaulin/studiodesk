@@ -88,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed lg:static top-16 bottom-0 left-0 z-50 w-64 shrink-0 bg-[#111111] text-white flex flex-col justify-between transition-transform duration-300 ease-in-out border-r border-[#1a1a1a] ${
+        className={`fixed top-16 bottom-0 left-0 z-50 w-64 bg-[#111111] text-white flex flex-col justify-between transition-transform duration-300 ease-in-out border-r border-[#1a1a1a] ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         id="main-sidebar"
