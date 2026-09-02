@@ -53,10 +53,8 @@ export const App: React.FC = () => {
       return;
     }
     if (!isAuthenticated) return;
-    if (currentView === 'auth' || currentView === 'login') {
-      setCurrentView(!user.businessType || !user.teamSize ? 'profile_select' : 'dashboard');
-      return;
-    }
+    // Uma sessão restaurada pode permanecer na tela de login. O redirecionamento
+    // ao painel acontece somente após o usuário enviar o login novamente.
     const permission = viewPermission[currentView];
     if (permission && !can(permission)) setCurrentView('dashboard');
   }, [authReady, isAuthenticated, currentView, can, setCurrentView, isPublicView, user.businessType, user.teamSize]);
