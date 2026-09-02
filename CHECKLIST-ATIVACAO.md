@@ -19,6 +19,11 @@ SUPABASE_SERVICE_ROLE_KEY=sb_secret_SUA_NOVA_CHAVE
 APP_URL=http://localhost:3000
 ```
 
+Na Vercel, cadastre cada variável sem aspas e sem `=` no campo do nome. Marque
+Production, Preview e Development e faça um novo deploy; variáveis `VITE_*`
+só entram no site durante o build. Projetos Supabase antigos também podem usar
+`VITE_SUPABASE_ANON_KEY` no lugar de `VITE_SUPABASE_PUBLISHABLE_KEY`.
+
 As integrações opcionais podem permanecer vazias durante o primeiro teste.
 
 ## 3. Supabase Auth
