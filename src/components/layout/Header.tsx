@@ -69,7 +69,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCre
   };
 
   return (
-    <header className="h-16 bg-white border-b border-[#DDE3E8] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs" id="main-header">
+    <header className="h-16 shrink-0 bg-white border-b border-[#DDE3E8] px-4 sm:px-6 flex items-center justify-between z-30 shadow-2xs" id="main-header">
       {/* Left side: Mobile burger + View title */}
       <div className="flex items-center gap-3">
         <button
