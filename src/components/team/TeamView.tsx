@@ -5,31 +5,33 @@ import { TeamMember } from '../../types';
 import { getPlanDetails } from '../../data/plans';
 
 export const TeamView: React.FC = () => {
-  const { team, addTeamMember, removeTeamMember, user, setCurrentView } = useApp();
+  const { team, inviteTeamMember, removeTeamMember, user, setCurrentView, addToast } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [role, setRole] = useState('Editor & Motion Designer');
   const [email, setEmail] = useState('');
-  const [permission, setPermission] = useState<'admin' | 'editor' | 'atendimento'>('editor');
+  const [permission, setPermission] = useState<'admin' | 'gestor' | 'colaborador'>('gestor');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const planDetails = getPlanDetails(user.plan);
   const currentMembersCount = team.length;
   const isSoloPlan = user.plan === 'solo' || user.plan === 'individual';
   const isCapacityReached = currentMembersCount >= planDetails.userLimit;
 
-  const handleAddMember = (e: React.FormEvent) => {
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
-    addTeamMember({
-      name: name.trim(),
-      role: role.trim(),
-      email: email.trim(),
-      permission,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-    });
-    setName('');
-    setEmail('');
-    setIsModalOpen(false);
+    if (!name.trim() || !email.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await inviteTeamMember({ name: name.trim(), role: role.trim(), email: email.trim(), accessLevel: permission });
+      setName('');
+      setEmail('');
+      setIsModalOpen(false);
+    } catch (error) {
+      addToast('error', 'Convite não enviado', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -100,10 +102,10 @@ export const TeamView: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-sm text-[#111111] truncate">{member.name}</h3>
                   <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                    member.permission === 'admin' ? 'bg-purple-100 text-purple-800' :
-                    member.permission === 'editor' ? 'bg-blue-100 text-[#2F6F9C]' : 'bg-gray-100 text-gray-800'
+                    member.accessLevel === 'admin' ? 'bg-purple-100 text-purple-800' :
+                    member.accessLevel === 'gestor' ? 'bg-blue-100 text-[#2F6F9C]' : 'bg-gray-100 text-gray-800'
                   }`}>
-                    {member.permission}
+                    {member.accessLevel}
                   </span>
                 </div>
                 <p className="text-xs text-[#2F6F9C] font-semibold">{member.role}</p>
@@ -183,8 +185,8 @@ export const TeamView: React.FC = () => {
                   onChange={e => setPermission(e.target.value as any)}
                   className="w-full px-3 py-2 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none"
                 >
-                  <option value="editor">Editor (Gerencia tarefas e projetos)</option>
-                  <option value="atendimento">Atendimento (CRM e comunicação com clientes)</option>
+                  <option value="gestor">Gestor (Gerencia tarefas e projetos)</option>
+                  <option value="colaborador">Colaborador (CRM e comunicação)</option>
                   <option value="admin">Administrador (Controle total de configurações)</option>
                 </select>
               </div>
@@ -199,9 +201,10 @@ export const TeamView: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors"
+                  disabled={isSubmitting || isCapacityReached || isSoloPlan}
+                  className="bg-[#111111] hover:bg-[#2F6F9C] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors"
                 >
-                  Enviar Convite
+                  {isSubmitting ? 'Enviando...' : 'Enviar Convite'}
                 </button>
               </div>
             </form>
