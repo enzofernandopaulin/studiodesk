@@ -1,38 +1,49 @@
-import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, serverError } from '../_lib/http.js';
-import { rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
+import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
 
 type InviteRole = 'admin' | 'gestor' | 'colaborador';
 type Body = { name?: unknown; email?: unknown; jobTitle?: unknown; role?: unknown };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default async function handler(request: Request): Promise<Response> {
-  if (request.method !== 'POST') return methodNotAllowed(['POST']);
-  const limited = rateLimit(request, 10);
-  if (limited) return limited;
-  const originError = requireAllowedOrigin(request);
-  if (originError) return originError;
+export default async function handler(request: any, response: any) {
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  if (request.method !== 'POST') {
+    response.setHeader('Allow', 'POST');
+    return response.status(405).json({ error: 'Método não permitido.' });
+  }
 
   try {
-    const { user, admin } = await authenticateRequest(request);
-    const inviter = await getMembership(admin, user.id);
-    if (!inviter || inviter.role !== 'admin') {
-      return json({ error: 'Somente administradores podem convidar membros.' }, 403);
+    const origin = typeof request.headers?.origin === 'string' ? request.headers.origin.replace(/\/$/, '') : '';
+    const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
+    if (origin && appUrl && origin !== appUrl) {
+      return response.status(403).json({ error: 'Origem da solicitação não autorizada.' });
     }
 
-    const body = await readJson<Body>(request);
+    const authorization = typeof request.headers?.authorization === 'string' ? request.headers.authorization : '';
+    const token = authorization.toLowerCase().startsWith('bearer ') ? authorization.slice(7).trim() : '';
+    if (!token) return response.status(401).json({ error: 'Não autenticado.' });
+
+    const admin = getAdminClient();
+    const { data: authData, error: authError } = await admin.auth.getUser(token);
+    if (authError || !authData.user) return response.status(401).json({ error: 'Sessão inválida ou expirada.' });
+    const user = authData.user;
+    const inviter = await getMembership(admin, user.id);
+    if (!inviter || inviter.role !== 'admin') {
+      return response.status(403).json({ error: 'Somente administradores podem convidar membros.' });
+    }
+
+    const body: Body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
     const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
     const jobTitle = typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '';
     const role = body.role as InviteRole;
     if (!name || !EMAIL.test(email) || !jobTitle || !['admin', 'gestor', 'colaborador'].includes(role)) {
-      return json({ error: 'Nome, e-mail, cargo e permissão válidos são obrigatórios.' }, 400);
+      return response.status(400).json({ error: 'Nome, e-mail, cargo e permissão válidos são obrigatórios.' });
     }
 
-    const appUrl = (process.env.APP_URL || '').replace(/\/$/, '');
     if (!appUrl.startsWith('https://')) {
-      return json({ error: 'APP_URL precisa conter a URL HTTPS do sistema na Vercel.' }, 503);
+      return response.status(503).json({ error: 'APP_URL precisa conter a URL HTTPS do sistema na Vercel.' });
     }
 
     const { data: invite, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
@@ -41,11 +52,11 @@ export default async function handler(request: Request): Promise<Response> {
     });
     if (inviteError || !invite.user) {
       const duplicate = /already|registered|exists/i.test(inviteError?.message || '');
-      return json({
+      return response.status(400).json({
         error: duplicate
           ? 'Este e-mail já possui uma conta. Use outro e-mail ou remova o usuário antigo antes de convidar.'
           : (inviteError?.message || 'Não foi possível enviar o convite.'),
-      }, 400);
+      });
     }
 
     const invitedUserId = invite.user.id;
@@ -95,7 +106,7 @@ export default async function handler(request: Request): Promise<Response> {
     });
     if (teamError) throw teamError;
 
-    return json({
+    return response.status(201).json({
       invited: true,
       member: {
         id: member.id,
@@ -107,14 +118,14 @@ export default async function handler(request: Request): Promise<Response> {
         projectsCount: 0,
         status: 'convidado',
       },
-    }, 201);
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
-    if (message.includes('Token de autenticação ausente') || message.includes('Sessão inválida')) {
-      return json({ error: 'Não autenticado.' }, 401);
-    }
-    if (message.includes('Payload muito grande')) return json({ error: message }, 413);
     console.error('POST /api/team/invite failed', error);
-    return serverError();
+    return response.status(500).json({
+      error: process.env.VERCEL_ENV === 'production'
+        ? 'Erro interno ao processar o convite.'
+        : (message || 'Erro interno ao processar o convite.'),
+    });
   }
 }
