@@ -1,6 +1,6 @@
-import { authenticateRequest, getMembership } from '../../_lib/supabaseAdmin';
-import { json, methodNotAllowed, serverError } from '../../_lib/http';
-import { rateLimit, readJson, requireAllowedOrigin } from '../../_lib/security';
+import { authenticateRequest, getMembership } from '../../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, serverError } from '../../_lib/http.js';
+import { rateLimit, readJson, requireAllowedOrigin } from '../../_lib/security.js';
 
 type Body = { to?: unknown; subject?: unknown; html?: unknown; text?: unknown };
 
