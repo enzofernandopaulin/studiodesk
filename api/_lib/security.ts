@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { json } from './http';
+import { json } from './http.js';
 
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_STORAGE_PATH = 1024;
