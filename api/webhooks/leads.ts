@@ -1,6 +1,6 @@
-import { getAdminClient } from '../_lib/supabaseAdmin';
-import { json, methodNotAllowed, serverError } from '../_lib/http';
-import { rateLimit, readJson } from '../_lib/security';
+import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, serverError } from '../_lib/http.js';
+import { rateLimit, readJson } from '../_lib/security.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
 type Body = { workspaceId?: unknown; name?: unknown; email?: unknown; phone?: unknown; whatsapp?: unknown; company?: unknown; serviceInterest?: unknown; source?: unknown; notes?: unknown; value?: unknown };
