@@ -1,5 +1,5 @@
-import { json, methodNotAllowed } from './_lib/http';
-import { rateLimit } from './_lib/security';
+import { json, methodNotAllowed } from './_lib/http.js';
+import { rateLimit } from './_lib/security.js';
 
 export default async function handler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return methodNotAllowed(['GET']);
