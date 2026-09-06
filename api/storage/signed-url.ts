@@ -1,6 +1,6 @@
-import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin';
-import { json, methodNotAllowed, serverError } from '../_lib/http';
-import { isSafeStoragePath, rateLimit, readJson, requireAllowedOrigin } from '../_lib/security';
+import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, serverError } from '../_lib/http.js';
+import { isSafeStoragePath, rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
 
 const DEFAULT_EXPIRATION = 3600;
 const MAX_EXPIRATION = 3600;
