@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from './context/AppContext';
 import { LandingPage } from './components/landing/LandingPage';
 import { AuthView } from './components/auth/AuthModal';
+import { InvitePasswordSetup } from './components/auth/InvitePasswordSetup';
 import { ProfileSelection } from './components/onboarding/ProfileSelection';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { FirstAccessChecklist } from './components/onboarding/FirstAccessChecklist';
@@ -140,6 +141,7 @@ export const App: React.FC = () => {
       {/* Global Modals & Notifications */}
       <ToastContainer />
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <InvitePasswordSetup />
 
       <LeadModal
         isOpen={isLeadModalOpen}
