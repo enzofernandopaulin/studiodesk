@@ -17,6 +17,7 @@ export const TeamView: React.FC = () => {
   const [teamName, setTeamName] = useState(user.companyName || 'Minha Equipe');
   const [linkPermission, setLinkPermission] = useState<'admin' | 'gestor' | 'colaborador'>('colaborador');
   const [inviteLink, setInviteLink] = useState('');
+  const [inviteMaxUses, setInviteMaxUses] = useState(0);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const planDetails = getPlanDetails(user.plan);
@@ -44,10 +45,11 @@ export const TeamView: React.FC = () => {
     e.preventDefault();
     setIsGeneratingLink(true);
     try {
-      const result = await callServerApi<{ inviteUrl: string }>('/api/team/invitations', {
+      const result = await callServerApi<{ inviteUrl: string; maxUses: number }>('/api/team/invitations', {
         method: 'POST', body: JSON.stringify({ teamName: teamName.trim(), role: linkPermission }),
       });
       setInviteLink(result.inviteUrl);
+      setInviteMaxUses(result.maxUses);
       addToast('success', 'Equipe pronta', 'O link de entrada foi criado e vale por 7 dias.');
     } catch (error) {
       addToast('error', 'Link não criado', error instanceof Error ? error.message : 'Tente novamente.');
@@ -73,7 +75,7 @@ export const TeamView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-          <button onClick={() => { setInviteLink(''); setIsLinkModalOpen(true); }} className="border border-[#2F6F9C] bg-white text-[#2F6F9C] font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"><Link2 className="w-4 h-4" />Criar equipe por link</button>
+          <button disabled={isCapacityReached || isSoloPlan} onClick={() => { setInviteLink(''); setInviteMaxUses(0); setIsLinkModalOpen(true); }} className="border border-[#2F6F9C] bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 disabled:cursor-not-allowed text-[#2F6F9C] font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"><Link2 className="w-4 h-4" />Criar equipe por link</button>
           <button onClick={() => setIsModalOpen(true)} className="bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2"><UserPlus className="w-4 h-4 text-[#66acd7]" /><span>Convidar por e-mail</span></button>
         </div>
       </div>
@@ -158,7 +160,7 @@ export const TeamView: React.FC = () => {
               <div><label className="block text-xs font-bold mb-1">Nome da equipe</label><input required value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm" /></div>
               <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Administrador</option></select></div>
               <button disabled={isGeneratingLink} className="w-full bg-[#111111] text-white font-bold text-sm py-3 rounded-xl disabled:bg-gray-400">{isGeneratingLink ? 'Criando...' : 'Criar equipe e gerar link'}</button>
-            </form> : <div className="space-y-4"><p className="text-sm text-[#6B7280]">Envie este link aos seus colegas. Ele expira em 7 dias e aceita até 25 entradas.</p><div className="break-all rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] p-3 text-xs">{inviteLink}</div><button onClick={copyInviteLink} className="w-full flex items-center justify-center gap-2 bg-[#111111] text-white font-bold text-sm py-3 rounded-xl"><Copy className="w-4 h-4 text-[#66acd7]" />Copiar link</button></div>}
+            </form> : <div className="space-y-4"><p className="text-sm text-[#6B7280]">Envie este link aos seus colegas. Ele expira em 7 dias e aceita até {inviteMaxUses} {inviteMaxUses === 1 ? 'entrada' : 'entradas'}, conforme as vagas restantes do plano.</p><div className="break-all rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] p-3 text-xs">{inviteLink}</div><button onClick={copyInviteLink} className="w-full flex items-center justify-center gap-2 bg-[#111111] text-white font-bold text-sm py-3 rounded-xl"><Copy className="w-4 h-4 text-[#66acd7]" />Copiar link</button></div>}
           </div>
         </div>
       )}
