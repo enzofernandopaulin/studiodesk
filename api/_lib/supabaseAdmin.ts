@@ -1,13 +1,28 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function cleanEnv(value: string | undefined): string {
+  return (value || '').trim().replace(/^['"]|['"]$/g, '').trim();
+}
+
+function validSupabaseUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+const serverUrl = cleanEnv(process.env.SUPABASE_URL);
+const publicUrl = cleanEnv(process.env.VITE_SUPABASE_URL);
+const supabaseUrl = validSupabaseUrl(serverUrl) ? serverUrl : (validSupabaseUrl(publicUrl) ? publicUrl : '');
+const serviceRoleKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export const isServerSupabaseConfigured = Boolean(supabaseUrl && serviceRoleKey);
 
 export function getAdminClient(): SupabaseClient {
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY precisam estar configurados na Vercel.');
+    throw new Error('Configure uma URL Supabase válida em SUPABASE_URL ou VITE_SUPABASE_URL e confira SUPABASE_SERVICE_ROLE_KEY na Vercel.');
   }
 
   return createClient(supabaseUrl, serviceRoleKey, {
