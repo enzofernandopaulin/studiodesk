@@ -29,6 +29,7 @@ import { entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } fr
 import { uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
 import { subscribeToWorkspaceRealtime, removeRealtimeChannel, RealtimeTable } from '../lib/realtimeRepository';
+import { callServerApi } from '../lib/serverApi';
 
 export interface ToastMessage {
   id: string;
@@ -217,6 +218,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!supabase) return;
 
     try {
+      // Contas antigas ou criadas antes dos triggers atuais são reparadas
+      // no servidor antes de qualquer consulta protegida por workspace.
+      await callServerApi('/api/session/bootstrap', { method: 'POST' });
       const [profile, workspace] = await Promise.all([
         loadProfile(userId),
         loadWorkspace(userId),
@@ -268,8 +272,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return !profile.businessType || !profile.teamSize;
     } catch (error) {
       console.error('StudioDesk: falha ao carregar dados do Supabase', error);
-      addToast('error', 'Falha ao carregar a nuvem', 'Não foi possível carregar seu workspace. Sua sessão local será encerrada para evitar um estado inconsistente.');
-      setAuthUserId(null);
+      const message = error instanceof Error ? error.message : 'Não foi possível carregar seu workspace.';
+      addToast('error', 'Falha ao carregar a nuvem', `${message} Sua sessão foi mantida para que você possa tentar novamente ou aceitar um convite.`);
+      setAuthUserId(userId);
+      setUserState(prev => ({ ...prev, id: userId }));
       setLeads([]);
       setClients([]);
       setProjects([]);
@@ -283,8 +289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTeam([]);
       setIntegrations([]);
       setIsHydrated(true);
-      void supabase.auth.signOut({ scope: 'local' });
-      return null;
+      return true;
     }
   };
 
