@@ -6,8 +6,37 @@ const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10
 
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
-  if (request.method !== 'POST') return response.status(405).json({ error: 'Método não permitido.' });
   try {
+    if (request.method === 'GET') {
+      const rawQueryToken = Array.isArray(request.query?.token) ? request.query.token[0] : request.query?.token;
+      const rawToken = typeof rawQueryToken === 'string' ? rawQueryToken.trim() : '';
+      if (!/^[a-f0-9]{64}$/i.test(rawToken)) return response.status(400).json({ error: 'Link de convite inválido.' });
+
+      const admin = getAdminClient();
+      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+      const { data: invitation, error } = await admin.from('workspace_invitations')
+        .select('workspace_id,role,email,expires_at,max_uses,uses_count')
+        .eq('token_hash', tokenHash).maybeSingle();
+      if (error || !invitation) return response.status(404).json({ error: 'Convite não encontrado.' });
+      if (invitation.uses_count >= invitation.max_uses) return response.status(409).json({ error: 'Este convite atingiu o limite de entradas.' });
+      if (new Date(invitation.expires_at).getTime() < Date.now()) return response.status(410).json({ error: 'Este convite expirou.' });
+
+      const { data: workspace, error: workspaceError } = await admin.from('workspaces')
+        .select('name').eq('id', invitation.workspace_id).single();
+      if (workspaceError) throw workspaceError;
+      return response.status(200).json({
+        workspaceName: workspace.name,
+        role: invitation.role,
+        expiresAt: invitation.expires_at,
+        emailRestricted: Boolean(invitation.email),
+      });
+    }
+
+    if (request.method !== 'POST') {
+      response.setHeader('Allow', 'GET, POST');
+      return response.status(405).json({ error: 'Método não permitido.' });
+    }
+
     const token = String(request.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
     const admin = getAdminClient();
     const { data: auth, error: authError } = await admin.auth.getUser(token);
@@ -67,7 +96,7 @@ export default async function handler(request: any, response: any) {
 
     return response.status(201).json({ inviteUrl, emailSent, emailWarning, expiresInDays: 7, maxUses: email ? 1 : remainingSeats, planLimit, remainingSeats });
   } catch (error) {
-    console.error('POST /api/team/invitations failed', error);
+    console.error(`${request.method} /api/team/invitations failed`, error);
     return response.status(500).json({ error: 'Não foi possível criar o convite.' });
   }
 }
