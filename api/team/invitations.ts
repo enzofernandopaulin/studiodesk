@@ -1,6 +1,5 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
-import { sendInviteEmail } from '../_lib/email.js';
 
 type Role = 'admin' | 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
@@ -55,10 +54,6 @@ export default async function handler(request: any, response: any) {
     if (remainingSeats === 0) return response.status(409).json({ error: `O Plano ${plan} atingiu o limite de ${planLimit} usuário(s).` });
 
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
-    const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
-    const recipientName = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
-    const jobTitle = typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '';
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return response.status(400).json({ error: 'Informe um endereço de e-mail válido.' });
     const teamName = typeof body.teamName === 'string' ? body.teamName.trim().slice(0, 120) : '';
     const role: Role = ['admin','gestor','colaborador'].includes(body.role) ? body.role : 'colaborador';
     const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
@@ -74,12 +69,10 @@ export default async function handler(request: any, response: any) {
     const { error: insertError } = await admin.from('workspace_invitations').insert({
       workspace_id: membership.workspace_id,
       token_hash: tokenHash,
-      email: email || null,
-      invited_name: recipientName || null,
-      job_title: jobTitle || null,
+      email: null,
       role,
       created_by: auth.user.id,
-      max_uses: email ? 1 : remainingSeats,
+      max_uses: remainingSeats,
     });
     if (insertError) {
       if (/workspace_invitations/i.test(insertError.message)) return response.status(503).json({ error: 'Execute supabase/TEAM-INVITES.sql no Supabase antes de criar convites.' });
@@ -87,52 +80,7 @@ export default async function handler(request: any, response: any) {
     }
 
     const inviteUrl = `${appUrl}/?team_invite=${rawToken}`;
-    let emailSent = false;
-    let emailWarning = '';
-    if (email) {
-      const { data: inviterProfile } = await admin.from('profiles').select('name').eq('id', auth.user.id).maybeSingle();
-      const resendKey = String(process.env.RESEND_API_KEY || '').trim();
-      const resendFrom = String(process.env.INVITE_FROM_EMAIL || '').trim();
-      const hasCustomSender = Boolean(resendKey && resendFrom && !/@(?:gmail|outlook|hotmail|yahoo)\./i.test(resendFrom));
-      if (hasCustomSender) {
-        try {
-          await sendInviteEmail({
-            to: email,
-            recipientName,
-            inviterName: inviterProfile?.name || auth.user.email || 'StudioDesk',
-            workspaceName: teamName || workspacePlan.name || 'StudioDesk',
-            role,
-            inviteUrl,
-          });
-          emailSent = true;
-        } catch (sendError) {
-          console.error('Workspace invitation email failed', sendError);
-          emailWarning = 'O provedor de e-mail recusou o envio. Confira o remetente e os logs da Resend.';
-        }
-      } else {
-        const { error: magicLinkError } = await admin.auth.signInWithOtp({
-          email,
-          options: {
-            shouldCreateUser: true,
-            emailRedirectTo: inviteUrl,
-            data: {
-              invited_workspace_id: membership.workspace_id,
-              invited_name: recipientName,
-              job_title: jobTitle,
-            },
-          },
-        });
-        emailSent = !magicLinkError;
-        if (magicLinkError) {
-          console.error('Supabase invitation magic link failed', magicLinkError);
-          emailWarning = /rate limit/i.test(magicLinkError.message)
-            ? 'O limite de e-mails do Supabase foi atingido. Configure o SMTP personalizado em Authentication > SMTP Settings.'
-            : `O Supabase não enviou o e-mail: ${magicLinkError.message}`;
-        }
-      }
-    }
-
-    return response.status(201).json({ inviteUrl, emailSent, emailWarning, expiresInDays: 7, maxUses: email ? 1 : remainingSeats, planLimit, remainingSeats });
+    return response.status(201).json({ inviteUrl, expiresInDays: 7, maxUses: remainingSeats, planLimit, remainingSeats });
   } catch (error) {
     console.error(`${request.method} /api/team/invitations failed`, error);
     const message = error instanceof Error ? error.message : '';
