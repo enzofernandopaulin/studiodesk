@@ -115,6 +115,7 @@ interface AppContextType {
   sendMessage: (clientId: string, content: string, projectId?: string, mediaType?: 'text' | 'audio' | 'video' | 'file') => void;
   addTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => void;
   removeTeamMember: (id: string) => void;
+  refreshTeam: () => Promise<void>;
   toggleIntegration: (id: string) => void;
   
   // Authentication / persistence
@@ -198,6 +199,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
 
+  const fetchCanonicalTeam = async (): Promise<TeamMember[]> => {
+    const result = await callServerApi<{ members: TeamMember[] }>('/api/team/members');
+    return result.members;
+  };
+
+  const refreshTeam = async () => {
+    const members = await fetchCanonicalTeam();
+    setTeam(members);
+  };
+
 
   const buildWorkspaceState = (): WorkspaceState => ({
     leads,
@@ -221,9 +232,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
       await callServerApi('/api/session/bootstrap', { method: 'POST' });
-      const [profile, workspace] = await Promise.all([
+      const [profile, workspace, canonicalTeam] = await Promise.all([
         loadProfile(userId),
         loadWorkspace(userId),
+        fetchCanonicalTeam().catch(error => {
+          console.error('StudioDesk: falha ao carregar diretório canônico da equipe', error);
+          return null;
+        }),
       ]);
 
       if (!profile) {
@@ -249,7 +264,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCommunications([]);
         setCalendarEvents([]);
         setApprovalRequests([]);
-        setTeam([]);
+        setTeam(canonicalTeam ?? []);
         setIntegrations([]);
       } else {
         setLeads(workspace.leads ?? []);
@@ -262,7 +277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCommunications(workspace.communications ?? []);
         setCalendarEvents(workspace.calendarEvents ?? []);
         setApprovalRequests(workspace.approvalRequests ?? []);
-        setTeam(workspace.team ?? []);
+        setTeam(canonicalTeam ?? workspace.team ?? []);
         setIntegrations(workspace.integrations ?? []);
       }
 
@@ -1121,9 +1136,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const removeTeamMember = (id: string) => {
     if (denyAction('manage:team')) return;
-    setTeam(prev => prev.filter(m => m.id !== id));
-    persist(entityRepository.team.delete(authUserId || '', id), 'O membro foi removido da tela, mas a nuvem não confirmou a exclusão.');
-    addToast('info', 'Membro Removido', 'O colaborador foi removido da equipe.');
+    const member = team.find(item => item.id === id);
+    if (!member?.userId) {
+      addToast('error', 'Membro não removido', 'Atualize a lista da equipe e tente novamente.');
+      return;
+    }
+    void callServerApi('/api/team/members', {
+      method: 'DELETE',
+      body: JSON.stringify({ userId: member.userId }),
+    }).then(async () => {
+      await refreshTeam();
+      addToast('info', 'Membro removido', 'O acesso desse colaborador ao workspace foi encerrado.');
+    }).catch(error => {
+      addToast('error', 'Membro não removido', error instanceof Error ? error.message : 'Tente novamente.');
+    });
   };
 
   // Integrations
@@ -1206,6 +1232,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCommunication,
         addTeamMember,
         removeTeamMember,
+        refreshTeam,
         toggleIntegration,
         isSupabaseConfigured,
         isAuthenticated: Boolean(authUserId),

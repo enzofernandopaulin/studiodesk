@@ -224,6 +224,7 @@ export interface Communication {
 
 export interface TeamMember {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   role: string; // e.g. "Diretor Audiovisual", "Editor Chefe"
@@ -231,6 +232,8 @@ export interface TeamMember {
   avatar: string;
   projectsCount: number;
   status: 'ativo' | 'convidado';
+  isOwner?: boolean;
+  joinedAt?: string;
 }
 
 export interface IntegrationItem {
