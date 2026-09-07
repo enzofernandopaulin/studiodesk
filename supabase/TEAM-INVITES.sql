@@ -1,4 +1,6 @@
--- Execute uma vez no SQL Editor do Supabase.
+-- ARQUIVO LEGADO. Não execute isoladamente.
+-- Use supabase/CORRECAO-WORKSPACES-E-CONVITES.sql, que contém a correção completa.
+-- Mantido apenas como histórico da primeira tabela de convites.
 create table if not exists public.workspace_invitations (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
