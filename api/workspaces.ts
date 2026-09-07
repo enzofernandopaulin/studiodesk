@@ -20,7 +20,7 @@ export default async function handler(request: any, response: any) {
       if (error) throw error;
       const ids = (memberships || []).map(item => item.workspace_id);
       const { data: workspaces, error: workspaceError } = ids.length
-        ? await admin.from('workspaces').select('id,name,created_at').in('id', ids)
+        ? await admin.from('workspaces').select('id,name,plan,created_at').in('id', ids)
         : { data: [], error: null };
       if (workspaceError) throw workspaceError;
       const names = new Map((workspaces || []).map(item => [item.id, item]));
@@ -34,7 +34,8 @@ export default async function handler(request: any, response: any) {
     if (request.method === 'POST') {
       const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
       if (!name) return response.status(400).json({ error: 'Informe o nome do novo workspace.' });
-      const { data: workspace, error } = await admin.from('workspaces').insert({ name }).select('id,name').single();
+      const { data: profile } = await admin.from('profiles').select('plan').eq('id', user.id).maybeSingle();
+      const { data: workspace, error } = await admin.from('workspaces').insert({ name, owner_id: user.id, plan: profile?.plan || 'individual' }).select('id,name,plan').single();
       if (error) throw error;
       const { error: membershipError } = await admin.from('workspace_members').insert({ workspace_id: workspace.id, user_id: user.id, role: 'admin' });
       if (membershipError) throw membershipError;
