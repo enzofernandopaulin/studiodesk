@@ -18,7 +18,7 @@
 
 ### Listar equipe
 
-`GET /api/team/members` autentica o usuário, identifica o workspace ativo e monta a lista a partir de `workspace_members`. Perfil e diretório apenas complementam nome, e-mail, avatar e cargo.
+`GET /api/team/invitations?resource=members` autentica o usuário, identifica o workspace ativo e monta a lista a partir de `workspace_members`. Perfil e diretório apenas complementam nome, e-mail, avatar e cargo.
 
 ### Entrar por link
 
@@ -26,7 +26,7 @@
 
 ### Remover membro
 
-`DELETE /api/team/members` chama `remove_workspace_member`, que valida o administrador, protege o proprietário, remove o acesso e seleciona um workspace válido para a conta removida.
+`DELETE /api/team/invitations?resource=members` chama `remove_workspace_member`, que valida o administrador, protege o proprietário, remove o acesso e seleciona um workspace válido para a conta removida.
 
 ## Ordem de implantação
 

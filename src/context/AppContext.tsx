@@ -200,7 +200,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
 
   const fetchCanonicalTeam = async (): Promise<TeamMember[]> => {
-    const result = await callServerApi<{ members: TeamMember[] }>('/api/team/members');
+    const result = await callServerApi<{ members: TeamMember[] }>('/api/team/invitations?resource=members');
     return result.members;
   };
 
@@ -1141,7 +1141,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToast('error', 'Membro não removido', 'Atualize a lista da equipe e tente novamente.');
       return;
     }
-    void callServerApi('/api/team/members', {
+    void callServerApi('/api/team/invitations?resource=members', {
       method: 'DELETE',
       body: JSON.stringify({ userId: member.userId }),
     }).then(async () => {
