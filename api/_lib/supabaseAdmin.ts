@@ -49,14 +49,19 @@ export async function authenticateRequest(request: Request): Promise<{ user: Use
 }
 
 export async function getMembership(admin: SupabaseClient, userId: string) {
-  const { data, error } = await admin
+  const { data: profile } = await admin.from('profiles').select('workspace_id').eq('id', userId).maybeSingle();
+  let query = admin
     .from('workspace_members')
     .select('workspace_id, role, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .eq('user_id', userId);
+  if (profile?.workspace_id) query = query.eq('workspace_id', profile.workspace_id);
+  const { data, error } = await query.order('created_at', { ascending: true }).limit(1).maybeSingle();
 
   if (error) throw error;
+  if (!data && profile?.workspace_id) {
+    const fallback = await admin.from('workspace_members').select('workspace_id, role, created_at').eq('user_id', userId).order('created_at').limit(1).maybeSingle();
+    if (fallback.error) throw fallback.error;
+    return fallback.data;
+  }
   return data;
 }
