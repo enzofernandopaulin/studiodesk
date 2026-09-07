@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Sparkles, Link2, Copy, RefreshCw } from 'lucide-react';
+import type { TeamMember } from '../../types';
 import { getPlanDetails } from '../../data/plans';
 import { callServerApi } from '../../lib/serverApi';
 
@@ -13,6 +14,16 @@ export const TeamView: React.FC = () => {
   const [inviteMaxUses, setInviteMaxUses] = useState(0);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isRefreshingTeam, setIsRefreshingTeam] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+
+  const confirmMemberRemoval = async () => {
+    if (!memberToRemove) return;
+    setIsRemovingMember(true);
+    const removed = await removeTeamMember(memberToRemove.id);
+    setIsRemovingMember(false);
+    if (removed) setMemberToRemove(null);
+  };
 
   const reloadTeam = async (silent = false) => {
     if (!silent) setIsRefreshingTeam(true);
@@ -137,7 +148,7 @@ export const TeamView: React.FC = () => {
               <span className="text-[10px] text-[#6B7280]">Acesso ao StudioDesk Ativo</span>
               {user.role === 'admin' && member.userId !== user.id && !member.isOwner && (
                 <button
-                  onClick={() => removeTeamMember(member.id)}
+                  onClick={() => setMemberToRemove(member)}
                   className="text-xs text-rose-600 hover:text-rose-800 font-semibold"
                 >
                   Remover
@@ -157,6 +168,34 @@ export const TeamView: React.FC = () => {
               <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Administrador</option></select></div>
               <button disabled={isGeneratingLink} className="w-full bg-[#111111] text-white font-bold text-sm py-3 rounded-xl disabled:bg-gray-400">{isGeneratingLink ? 'Criando...' : 'Criar equipe e gerar link'}</button>
             </form> : <div className="space-y-4"><p className="text-sm text-[#6B7280]">Envie este link aos seus colegas. Ele expira em 7 dias e aceita até {inviteMaxUses} {inviteMaxUses === 1 ? 'entrada' : 'entradas'}, conforme as vagas restantes do plano.</p><div className="break-all rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] p-3 text-xs">{inviteLink}</div><button onClick={copyInviteLink} className="w-full flex items-center justify-center gap-2 bg-[#111111] text-white font-bold text-sm py-3 rounded-xl"><Copy className="w-4 h-4 text-[#66acd7]" />Copiar link</button></div>}
+          </div>
+        </div>
+      )}
+
+      {memberToRemove && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-4 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="remove-member-title">
+          <div className="w-full max-w-md rounded-3xl border border-[#DDE3E8] bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 id="remove-member-title" className="font-display text-lg font-black uppercase text-[#111111]">Remover membro?</h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#6B7280]">
+                  <strong className="text-[#111111]">{memberToRemove.name}</strong> perderá o acesso ao workspace <strong className="text-[#111111]">{user.companyName}</strong>.
+                </p>
+              </div>
+              <button type="button" onClick={() => setMemberToRemove(null)} disabled={isRemovingMember} aria-label="Fechar confirmação" className="rounded-lg p-1 text-[#6B7280] hover:bg-[#F5F7F9] disabled:opacity-50"><X className="h-5 w-5" /></button>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-xs font-bold text-rose-800">O vínculo e o registro deste membro serão removidos do banco de dados da equipe.</p>
+              <p className="mt-1 text-xs text-rose-700">A conta pessoal não será apagada e poderá continuar em outros workspaces.</p>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-[#DDE3E8] pt-4">
+              <button type="button" onClick={() => setMemberToRemove(null)} disabled={isRemovingMember} className="rounded-xl px-4 py-2.5 text-sm font-bold text-[#6B7280] hover:bg-[#F5F7F9] disabled:opacity-50">Cancelar</button>
+              <button type="button" onClick={() => void confirmMemberRemoval()} disabled={isRemovingMember} className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300">
+                {isRemovingMember ? 'Removendo...' : 'Sim, remover acesso'}
+              </button>
+            </div>
           </div>
         </div>
       )}

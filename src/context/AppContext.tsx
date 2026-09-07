@@ -114,7 +114,7 @@ interface AppContextType {
   
   sendMessage: (clientId: string, content: string, projectId?: string, mediaType?: 'text' | 'audio' | 'video' | 'file') => void;
   addTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => void;
-  removeTeamMember: (id: string) => void;
+  removeTeamMember: (id: string) => Promise<boolean>;
   refreshTeam: () => Promise<void>;
   toggleIntegration: (id: string) => void;
   
@@ -1134,22 +1134,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', 'Membro Adicionado', `${newMember.name} foi adicionado à equipe com sucesso.`);
   };
 
-  const removeTeamMember = (id: string) => {
-    if (denyAction('manage:team')) return;
+  const removeTeamMember = async (id: string): Promise<boolean> => {
+    if (denyAction('manage:team')) return false;
     const member = team.find(item => item.id === id);
     if (!member?.userId) {
       addToast('error', 'Membro não removido', 'Atualize a lista da equipe e tente novamente.');
-      return;
+      return false;
     }
-    void callServerApi('/api/team/invitations?resource=members', {
-      method: 'DELETE',
-      body: JSON.stringify({ userId: member.userId }),
-    }).then(async () => {
+    try {
+      await callServerApi('/api/team/invitations?resource=members', {
+        method: 'DELETE',
+        body: JSON.stringify({ userId: member.userId }),
+      });
       await refreshTeam();
       addToast('info', 'Membro removido', 'O acesso desse colaborador ao workspace foi encerrado.');
-    }).catch(error => {
+      return true;
+    } catch (error) {
       addToast('error', 'Membro não removido', error instanceof Error ? error.message : 'Tente novamente.');
-    });
+      return false;
+    }
   };
 
   // Integrations
