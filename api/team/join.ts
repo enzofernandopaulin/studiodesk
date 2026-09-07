@@ -25,8 +25,18 @@ export default async function handler(request: any, response: any) {
       return response.status(403).json({ error: 'Este convite foi criado para outro e-mail.' });
     }
 
-    const { data: currentMembership } = await admin.from('workspace_members').select('user_id').eq('workspace_id', invitation.workspace_id).eq('user_id', auth.user.id).maybeSingle();
-    if (currentMembership) return response.status(200).json({ joined: true, alreadyMember: true });
+    const { data: currentMembership } = await admin.from('workspace_members').select('role').eq('workspace_id', invitation.workspace_id).eq('user_id', auth.user.id).maybeSingle();
+    if (currentMembership) {
+      const { data: existingWorkspace } = await admin.from('workspaces').select('name').eq('id', invitation.workspace_id).single();
+      const { error: selectError } = await admin.from('profiles').update({
+        workspace_id: invitation.workspace_id,
+        company_name: existingWorkspace.name,
+        role: currentMembership.role,
+        updated_at: new Date().toISOString(),
+      }).eq('id', auth.user.id);
+      if (selectError) throw selectError;
+      return response.status(200).json({ joined: true, alreadyMember: true, workspaceId: invitation.workspace_id, workspaceName: existingWorkspace.name });
+    }
 
     const { data: workspaceProfiles, error: planError } = await admin.from('profiles').select('plan').eq('workspace_id', invitation.workspace_id);
     if (planError) throw planError;
@@ -36,13 +46,13 @@ export default async function handler(request: any, response: any) {
     if ((membersCount || 0) >= planLimit) return response.status(409).json({ error: `Esta equipe atingiu o limite de ${planLimit} usuário(s) do plano atual.` });
 
     const { data: profile } = await admin.from('profiles').select('workspace_id,name,email').eq('id', auth.user.id).maybeSingle();
-    const previousWorkspace = profile?.workspace_id;
     const { error: memberError } = await admin.from('workspace_members').upsert({
       workspace_id: invitation.workspace_id, user_id: auth.user.id, role: invitation.role,
     }, { onConflict: 'workspace_id,user_id' });
     if (memberError) throw memberError;
+    const { data: targetWorkspace } = await admin.from('workspaces').select('name').eq('id', invitation.workspace_id).single();
     const { error: profileError } = await admin.from('profiles').update({
-      workspace_id: invitation.workspace_id, role: invitation.role, updated_at: new Date().toISOString(),
+      workspace_id: invitation.workspace_id, company_name: targetWorkspace.name, role: invitation.role, updated_at: new Date().toISOString(),
     }).eq('id', auth.user.id);
     if (profileError) throw profileError;
     await admin.from('workspace_invitations').update({ accepted_by: auth.user.id, accepted_at: new Date().toISOString(), uses_count: invitation.uses_count + 1 }).eq('id', invitation.id).eq('uses_count', invitation.uses_count);
@@ -53,12 +63,7 @@ export default async function handler(request: any, response: any) {
       avatar: '', projects_count: 0, status: 'ativo',
     }, { onConflict: 'workspace_id,id' });
 
-    if (previousWorkspace && previousWorkspace !== invitation.workspace_id) {
-      await admin.from('workspace_members').delete().eq('workspace_id', previousWorkspace).eq('user_id', auth.user.id);
-      const { count } = await admin.from('workspace_members').select('*', { count: 'exact', head: true }).eq('workspace_id', previousWorkspace);
-      if (count === 0) await admin.from('workspaces').delete().eq('id', previousWorkspace);
-    }
-    return response.status(200).json({ joined: true });
+    return response.status(200).json({ joined: true, workspaceId: invitation.workspace_id, workspaceName: targetWorkspace.name });
   } catch (error) {
     console.error('POST /api/team/join failed', error);
     return response.status(500).json({ error: 'Não foi possível entrar na equipe.' });
