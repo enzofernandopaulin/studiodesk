@@ -78,8 +78,10 @@ export const App: React.FC = () => {
 
   const restrictedView = Boolean(isAuthenticated && viewPermission[currentView] && !can(viewPermission[currentView]!));
 
-  if (!authReady && !isPublicOrOnboarding) {
-    return <div className="min-h-screen bg-[#F5F7F9] flex items-center justify-center text-xs font-bold text-[#6B7280]">Carregando sessão...</div>;
+  // Não renderiza a landing enquanto o Supabase restaura a sessão. Isso evita
+  // o flash visual landing -> dashboard em contas que já estão autenticadas.
+  if (!authReady) {
+    return <div className="min-h-screen bg-[#F5F7F9] flex items-center justify-center text-xs font-bold text-[#6B7280]">Carregando seu StudioDesk...</div>;
   }
 
   return (
