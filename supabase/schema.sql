@@ -16,11 +16,6 @@ create table if not exists public.workspaces (
   updated_at timestamptz not null default now()
 );
 
-alter table public.workspaces
-  add column if not exists owner_id uuid references auth.users(id) on delete set null;
-alter table public.workspaces
-  add column if not exists plan text not null default 'individual';
-
 create table if not exists public.workspace_members (
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -298,7 +293,6 @@ create table if not exists public.timeline_events (
 create table if not exists public.team_members (
   id text not null,
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
-  user_id uuid references auth.users(id) on delete set null,
   name text not null,
   email text not null default '',
   role text not null default '',
@@ -391,7 +385,13 @@ drop policy if exists "workspace_member_self" on public.workspace_members;
 create policy "workspace_member_self" on public.workspace_members for select to authenticated using (user_id = auth.uid());
 
 drop policy if exists "profiles_own_workspace" on public.profiles;
-create policy "profiles_own_workspace" on public.profiles for all to authenticated using (id = auth.uid()) with check (id = auth.uid());
+drop policy if exists "profiles_own_read" on public.profiles;
+drop policy if exists "profiles_own_update" on public.profiles;
+create policy "profiles_own_read" on public.profiles for select to authenticated using (id = auth.uid());
+create policy "profiles_own_update" on public.profiles for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+
+alter table public.workspace_invitations enable row level security;
+revoke all on public.workspace_invitations from anon, authenticated;
 
 -- ============================================================
 -- NOVO USUÁRIO: workspace + membership + profile
@@ -445,8 +445,8 @@ declare
   w uuid;
 begin
   for p in select * from public.profiles where workspace_id is null loop
-    insert into public.workspaces(name, owner_id, plan)
-    values (coalesce(nullif(p.company_name, ''), 'Minha Agência'), p.id, 'individual')
+    insert into public.workspaces(name)
+    values (coalesce(nullif(p.company_name, ''), 'Minha Agência'))
     returning id into w;
 
     insert into public.workspace_members(workspace_id, user_id, role)
@@ -479,6 +479,7 @@ begin
   if uid is null then raise exception 'Não autenticado'; end if;
   select workspace_id into wid from public.profiles where id = uid;
   if wid is null or not public.is_workspace_member(wid) then raise exception 'Workspace não encontrado'; end if;
+  if not public.is_workspace_manager() then raise exception 'Permissão insuficiente'; end if;
 
   delete from public.approval_comments where workspace_id = wid;
   delete from public.media_approvals where workspace_id = wid;
@@ -573,12 +574,9 @@ begin
 end;
 $$;
 
-grant execute on function public.sync_workspace(jsonb) to authenticated;
-
--- A aplicação usa mutações por entidade. Não mantenha disponível a antiga RPC
--- de snapshot, pois ela remove todos os registros antes de recriá-los.
-revoke execute on function public.sync_workspace(jsonb) from public, anon, authenticated;
-drop function if exists public.sync_workspace(jsonb);
+-- A aplicação persiste as entidades individualmente. A RPC de snapshot fica
+-- indisponível ao frontend para impedir substituições destrutivas acidentais.
+revoke all on function public.sync_workspace(jsonb) from public, anon, authenticated;
 
 -- ============================================================
 -- FASE 4 — AUTENTICAÇÃO, PAPÉIS E AUTORIZAÇÃO
@@ -620,22 +618,6 @@ returns boolean language sql stable security definer set search_path = public as
   select public.current_workspace_role() in ('admin','gestor');
 $$;
 
-create or replace function public.has_workspace_role(target_workspace uuid, allowed_roles text[])
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select exists (
-    select 1
-    from public.workspace_members wm
-    where wm.workspace_id = target_workspace
-      and wm.user_id = auth.uid()
-      and wm.role = any(allowed_roles)
-  );
-$$;
-
 -- Mantém campos de identidade/autorização do perfil sincronizados com membership.
 create or replace function public.protect_profile_membership_fields()
 returns trigger
@@ -646,12 +628,6 @@ as $$
 declare
   membership_role text;
 begin
-  if auth.role() = 'service_role' then
-    return new;
-  end if;
-
-  new.email := old.email;
-  new.plan := old.plan;
   select wm.role into membership_role
   from public.workspace_members wm
   where wm.user_id = old.id
@@ -674,6 +650,128 @@ create trigger protect_profile_membership_fields
 before update on public.profiles
 for each row execute procedure public.protect_profile_membership_fields();
 
+-- Mantém o limite do plano sincronizado nos workspaces pertencentes ao usuário.
+create or replace function public.sync_owner_workspace_plan()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.plan is distinct from old.plan
+     and new.plan in ('individual','solo','studio','empresa','agencia') then
+    update public.workspaces
+    set plan = new.plan, updated_at = now()
+    where owner_id = new.id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_owner_workspace_plan on public.profiles;
+create trigger sync_owner_workspace_plan
+after update of plan on public.profiles
+for each row execute procedure public.sync_owner_workspace_plan();
+
+-- Aceita um convite por link em uma única transação. O bloqueio do workspace
+-- impede que entradas simultâneas ultrapassem a quantidade do plano.
+create or replace function public.accept_workspace_invitation(
+  p_token_hash text,
+  p_user_id uuid,
+  p_name text default '',
+  p_email text default ''
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  invitation public.workspace_invitations%rowtype;
+  target_workspace public.workspaces%rowtype;
+  existing_role text;
+  member_count integer;
+  plan_limit integer;
+  was_already_member boolean;
+begin
+  if p_user_id is null or not exists (select 1 from auth.users u where u.id = p_user_id) then
+    raise exception 'Sessão inválida.' using errcode = 'P0001';
+  end if;
+
+  select * into invitation from public.workspace_invitations
+  where token_hash = p_token_hash for update;
+  if not found then raise exception 'Convite não encontrado.' using errcode = 'P0001'; end if;
+  if invitation.expires_at < now() then raise exception 'Este convite expirou.' using errcode = 'P0001'; end if;
+
+  select * into target_workspace from public.workspaces
+  where id = invitation.workspace_id for update;
+  if not found then raise exception 'Workspace não encontrado.' using errcode = 'P0001'; end if;
+
+  select wm.role into existing_role from public.workspace_members wm
+  where wm.workspace_id = invitation.workspace_id and wm.user_id = p_user_id;
+  was_already_member := existing_role is not null;
+
+  if not was_already_member then
+    if invitation.uses_count >= invitation.max_uses then
+      raise exception 'Este convite atingiu o limite de entradas.' using errcode = 'P0001';
+    end if;
+    if invitation.email is not null and lower(invitation.email) <> lower(coalesce(p_email, '')) then
+      raise exception 'Este convite foi criado para outro e-mail.' using errcode = 'P0001';
+    end if;
+
+    plan_limit := case target_workspace.plan
+      when 'studio' then 10 when 'empresa' then 25 when 'agencia' then 50 else 1
+    end;
+    select count(*)::integer into member_count from public.workspace_members wm
+    where wm.workspace_id = invitation.workspace_id;
+    if member_count >= plan_limit then
+      raise exception 'Esta equipe atingiu o limite de % usuário(s) do plano atual.', plan_limit using errcode = 'P0001';
+    end if;
+
+    insert into public.workspace_members(workspace_id, user_id, role)
+    values (invitation.workspace_id, p_user_id, invitation.role);
+    existing_role := invitation.role;
+    update public.workspace_invitations
+    set uses_count = uses_count + 1, accepted_by = p_user_id, accepted_at = now()
+    where id = invitation.id;
+  end if;
+
+  insert into public.profiles(id, workspace_id, name, email, company_name, role, plan, updated_at)
+  values (
+    p_user_id, invitation.workspace_id,
+    coalesce(nullif(p_name, ''), split_part(coalesce(p_email, ''), '@', 1), ''),
+    coalesce(p_email, ''), target_workspace.name, existing_role, 'individual', now()
+  )
+  on conflict (id) do update set
+    workspace_id = excluded.workspace_id,
+    company_name = excluded.company_name,
+    role = excluded.role,
+    updated_at = now();
+
+  insert into public.team_members(id, workspace_id, name, email, role, access_level, avatar, projects_count, status)
+  values (
+    'tm_' || p_user_id::text, invitation.workspace_id,
+    coalesce(nullif(p_name, ''), split_part(coalesce(p_email, ''), '@', 1), 'Membro'),
+    coalesce(p_email, ''), coalesce(nullif(invitation.job_title, ''), 'Membro da equipe'),
+    existing_role, '', 0, 'ativo'
+  )
+  on conflict (workspace_id, id) do update set
+    name = excluded.name, email = excluded.email,
+    access_level = excluded.access_level, status = 'ativo';
+
+  return jsonb_build_object(
+    'joined', true,
+    'alreadyMember', was_already_member,
+    'workspaceId', invitation.workspace_id,
+    'workspaceName', target_workspace.name,
+    'role', existing_role
+  );
+end;
+$$;
+
+revoke all on function public.accept_workspace_invitation(text, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.accept_workspace_invitation(text, uuid, text, text) to service_role;
+
 -- Reforça as políticas: leitura para membros; mutação administrativa para
 -- estrutura sensível; tarefas/comunicação/aprovações seguem operacionais.
 
@@ -686,19 +784,21 @@ begin
     execute format('drop policy if exists "workspace_manager_insert" on public.%I', t);
     execute format('drop policy if exists "workspace_manager_update" on public.%I', t);
     execute format('drop policy if exists "workspace_manager_delete" on public.%I', t);
+    execute format('drop policy if exists "workspace_member_insert" on public.%I', t);
+    execute format('drop policy if exists "workspace_member_update" on public.%I', t);
+    execute format('drop policy if exists "workspace_member_delete" on public.%I', t);
+    execute format('drop policy if exists "workspace_admin_insert" on public.%I', t);
+    execute format('drop policy if exists "workspace_admin_update" on public.%I', t);
+    execute format('drop policy if exists "workspace_admin_delete" on public.%I', t);
   end loop;
 end $$;
-
--- Convites são acessados somente pelas APIs server-side com service_role.
-alter table public.workspace_invitations enable row level security;
-revoke all on public.workspace_invitations from anon, authenticated;
 
 -- Todas as entidades podem ser lidas por membros do workspace.
 do $$
 declare t text;
 begin
   foreach t in array array['leads','clients','kanban_columns','projects','project_deliverables','media_approvals','approval_comments','approval_requests','calendar_events','tasks','messages','communications','timeline_events','team_members','integrations'] loop
-    execute format('create policy "workspace_member_select" on public.%I for select to authenticated using (public.is_workspace_member(workspace_id))', t);
+    execute format('create policy "workspace_member_select" on public.%I for select to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_member(workspace_id))', t);
   end loop;
 end $$;
 
@@ -707,9 +807,9 @@ do $$
 declare t text;
 begin
   foreach t in array array['leads','clients','kanban_columns','projects','project_deliverables','media_approvals','approval_comments','approval_requests','calendar_events'] loop
-    execute format('create policy "workspace_manager_insert" on public.%I for insert to authenticated with check (public.has_workspace_role(workspace_id, array[''admin'',''gestor'']))', t);
-    execute format('create policy "workspace_manager_update" on public.%I for update to authenticated using (public.has_workspace_role(workspace_id, array[''admin'',''gestor''])) with check (public.has_workspace_role(workspace_id, array[''admin'',''gestor'']))', t);
-    execute format('create policy "workspace_manager_delete" on public.%I for delete to authenticated using (public.has_workspace_role(workspace_id, array[''admin'',''gestor'']))', t);
+    execute format('create policy "workspace_manager_insert" on public.%I for insert to authenticated with check (workspace_id = public.current_workspace_id() and public.is_workspace_manager())', t);
+    execute format('create policy "workspace_manager_update" on public.%I for update to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_manager()) with check (workspace_id = public.current_workspace_id() and public.is_workspace_manager())', t);
+    execute format('create policy "workspace_manager_delete" on public.%I for delete to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_manager())', t);
   end loop;
 end $$;
 
@@ -718,26 +818,29 @@ do $$
 declare t text;
 begin
   foreach t in array array['tasks','messages','communications','timeline_events'] loop
-    execute format('create policy "workspace_member_insert" on public.%I for insert to authenticated with check (public.is_workspace_member(workspace_id))', t);
-    execute format('create policy "workspace_member_update" on public.%I for update to authenticated using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id))', t);
-    execute format('create policy "workspace_member_delete" on public.%I for delete to authenticated using (public.is_workspace_member(workspace_id))', t);
+    execute format('create policy "workspace_member_insert" on public.%I for insert to authenticated with check (workspace_id = public.current_workspace_id() and public.is_workspace_member(workspace_id))', t);
+    execute format('create policy "workspace_member_update" on public.%I for update to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_member(workspace_id)) with check (workspace_id = public.current_workspace_id() and public.is_workspace_member(workspace_id))', t);
+    execute format('create policy "workspace_member_delete" on public.%I for delete to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_member(workspace_id))', t);
   end loop;
 end $$;
 
 -- Equipe e integrações são administrativas.
-create policy "workspace_admin_insert" on public.team_members for insert to authenticated with check (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_update" on public.team_members for update to authenticated using (public.has_workspace_role(workspace_id, array['admin'])) with check (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_delete" on public.team_members for delete to authenticated using (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_insert" on public.integrations for insert to authenticated with check (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_update" on public.integrations for update to authenticated using (public.has_workspace_role(workspace_id, array['admin'])) with check (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_delete" on public.integrations for delete to authenticated using (public.has_workspace_role(workspace_id, array['admin']));
+create policy "workspace_admin_insert" on public.team_members for insert to authenticated with check (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_update" on public.team_members for update to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_admin()) with check (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_delete" on public.team_members for delete to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_insert" on public.integrations for insert to authenticated with check (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_update" on public.integrations for update to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_admin()) with check (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_delete" on public.integrations for delete to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
 
 -- Só admin pode administrar memberships.
 drop policy if exists "workspace_member_self" on public.workspace_members;
-create policy "workspace_member_self" on public.workspace_members for select to authenticated using (user_id = auth.uid() or public.is_workspace_admin());
-create policy "workspace_admin_members_insert" on public.workspace_members for insert to authenticated with check (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_members_update" on public.workspace_members for update to authenticated using (public.has_workspace_role(workspace_id, array['admin'])) with check (public.has_workspace_role(workspace_id, array['admin']));
-create policy "workspace_admin_members_delete" on public.workspace_members for delete to authenticated using (public.has_workspace_role(workspace_id, array['admin']));
+create policy "workspace_member_self" on public.workspace_members for select to authenticated using (user_id = auth.uid() or (workspace_id = public.current_workspace_id() and public.is_workspace_admin()));
+drop policy if exists "workspace_admin_members_insert" on public.workspace_members;
+drop policy if exists "workspace_admin_members_update" on public.workspace_members;
+drop policy if exists "workspace_admin_members_delete" on public.workspace_members;
+create policy "workspace_admin_members_insert" on public.workspace_members for insert to authenticated with check (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_members_update" on public.workspace_members for update to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_admin()) with check (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
+create policy "workspace_admin_members_delete" on public.workspace_members for delete to authenticated using (workspace_id = public.current_workspace_id() and public.is_workspace_admin());
 
 -- ============================================================
 -- FASE 5 — STORAGE PRIVADO PARA ARQUIVOS DO WORKSPACE
