@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { saveProfile } from '../../lib/workspaceRepository';
 import { Logo } from '../common/Logo';
 import { 
   ArrowRight, 
@@ -25,6 +26,7 @@ import {
 export const OnboardingWizard: React.FC = () => {
   const { user, setUser, setCurrentView, addToast, setKanbanColumns } = useApp();
   const [step, setStep] = useState(1);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // Form states initialized with current user profile
   const [name, setName] = useState(user.name || '');
@@ -120,10 +122,9 @@ export const OnboardingWizard: React.FC = () => {
     );
   };
 
-  const handleFinish = () => {
-    // 1. Save user configurations
-    setUser(prev => ({
-      ...prev,
+  const handleFinish = async () => {
+    const completedUser = {
+      ...user,
       name,
       email,
       avatar,
@@ -131,7 +132,20 @@ export const OnboardingWizard: React.FC = () => {
       teamSize,
       objectives,
       template
-    }));
+    };
+
+    setIsFinishing(true);
+    try {
+      // Persiste antes de liberar a escolha do convite. Assim o onboarding
+      // não volta a aparecer caso o usuário troque de workspace ou recarregue.
+      await saveProfile(completedUser);
+    } catch (error) {
+      setIsFinishing(false);
+      addToast('error', 'Configuração não salva', error instanceof Error ? error.message : 'Tente novamente.');
+      return;
+    }
+
+    setUser(completedUser);
 
     // 2. Set selected Kanban columns template
     const selectedTpl = templates.find(t => t.id === template);
@@ -141,6 +155,7 @@ export const OnboardingWizard: React.FC = () => {
 
     addToast('success', 'StudioDesk Configurado', 'Seu espaço de trabalho foi configurado com sucesso!');
     setCurrentView('first_access');
+    setIsFinishing(false);
   };
 
   return (
@@ -442,9 +457,10 @@ export const OnboardingWizard: React.FC = () => {
               ) : (
                 <button
                   onClick={handleFinish}
-                  className="bg-[#66acd7] hover:bg-[#529dc9] text-[#111111] font-bold text-xs sm:text-sm px-6 py-2.5 rounded-xl transition-all shadow-md inline-flex items-center gap-2"
+                  disabled={isFinishing}
+                  className="bg-[#66acd7] hover:bg-[#529dc9] disabled:cursor-not-allowed disabled:bg-gray-300 text-[#111111] font-bold text-xs sm:text-sm px-6 py-2.5 rounded-xl transition-all shadow-md inline-flex items-center gap-2"
                 >
-                  <span>Concluir e Abrir StudioDesk</span>
+                  <span>{isFinishing ? 'Salvando configuração...' : 'Concluir e Abrir StudioDesk'}</span>
                   <Check className="w-4 h-4 text-[#111111]" />
                 </button>
               )}

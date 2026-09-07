@@ -28,12 +28,14 @@ function resumeDashboard() {
 }
 
 export const TeamInviteJoin: React.FC = () => {
-  const { isAuthenticated, authReady, setCurrentView, addToast, user } = useApp();
+  const { isAuthenticated, authReady, currentView, setCurrentView, addToast, user } = useApp();
   const token = new URLSearchParams(window.location.search).get('team_invite');
   const [preview, setPreview] = useState<InvitePreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(Boolean(token));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
+  const onboardingComplete = Boolean(user.businessType?.trim() && user.teamSize?.trim() && user.template?.trim());
+  const onboardingInProgress = currentView === 'profile_select' || currentView === 'onboarding';
 
   useEffect(() => {
     if (!token) return;
@@ -54,12 +56,20 @@ export const TeamInviteJoin: React.FC = () => {
     setCurrentView('auth');
   }, [token, authReady, isAuthenticated, setCurrentView]);
 
+  useEffect(() => {
+    if (!token || !authReady || !isAuthenticated || onboardingComplete || onboardingInProgress) return;
+    setCurrentView('profile_select');
+  }, [token, authReady, isAuthenticated, onboardingComplete, onboardingInProgress, setCurrentView]);
+
   if (!token) return null;
   if (!authReady || loadingPreview) {
     return <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"><div className="rounded-3xl bg-white p-8 text-center shadow-2xl"><Users className="mx-auto mb-3 h-8 w-8 animate-pulse text-[#2F6F9C]" /><p className="font-bold text-[#111111]">Carregando convite...</p></div></div>;
   }
   if (!isAuthenticated) {
     return <div className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-[#111111] px-4 py-3 text-center text-xs font-bold text-white"><Users className="h-4 w-4 text-[#66acd7]" />Faça login ou crie uma conta. Depois você poderá escolher se entra na equipe.</div>;
+  }
+  if (!onboardingComplete) {
+    return <div className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-[#111111] px-4 py-3 text-center text-xs font-bold text-white"><Users className="h-4 w-4 text-[#66acd7]" />Conclua os 6 passos iniciais. Seu convite ficará reservado para a escolha do workspace.</div>;
   }
 
   const keepCurrent = () => {
@@ -115,9 +125,9 @@ export const TeamInviteJoin: React.FC = () => {
         ) : null}
 
         <div className="mt-6 grid gap-3">
-          <button onClick={joinTeam} disabled={working || !preview} className="flex items-center justify-between rounded-2xl bg-[#111111] px-5 py-4 text-left text-white transition-colors hover:bg-[#2F6F9C] disabled:cursor-not-allowed disabled:opacity-50"><span><strong className="block text-sm">Entrar nesta equipe</strong><span className="text-xs text-white/70">Vincula sua conta sem apagar seus outros workspaces.</span></span><LogIn className="h-5 w-5 text-[#66acd7]" /></button>
-          <button onClick={keepCurrent} disabled={working} className="flex items-center justify-between rounded-2xl border border-[#DDE3E8] px-5 py-4 text-left transition-colors hover:bg-[#F5F7F9] disabled:opacity-50"><span><strong className="block text-sm text-[#111111]">Continuar no meu workspace</strong><span className="text-xs text-[#6B7280]">Não aceita este convite agora.</span></span><Building2 className="h-5 w-5 text-[#2F6F9C]" /></button>
-          <button onClick={createWorkspace} disabled={working} className="flex items-center justify-between rounded-2xl border border-[#DDE3E8] px-5 py-4 text-left transition-colors hover:bg-[#F5F7F9] disabled:opacity-50"><span><strong className="block text-sm text-[#111111]">Criar um workspace próprio</strong><span className="text-xs text-[#6B7280]">Cria outro ambiente e o torna ativo.</span></span><Plus className="h-5 w-5 text-[#2F6F9C]" /></button>
+          <button onClick={keepCurrent} disabled={working} className="flex items-center justify-between rounded-2xl border border-[#DDE3E8] px-5 py-4 text-left transition-colors hover:bg-[#F5F7F9] disabled:opacity-50"><span><strong className="block text-sm text-[#111111]">Entrar no meu workspace</strong><span className="text-xs text-[#6B7280]">Mantém sua conta no workspace que já está ativo.</span></span><Building2 className="h-5 w-5 text-[#2F6F9C]" /></button>
+          <button onClick={joinTeam} disabled={working || !preview} className="flex items-center justify-between rounded-2xl bg-[#111111] px-5 py-4 text-left text-white transition-colors hover:bg-[#2F6F9C] disabled:cursor-not-allowed disabled:opacity-50"><span><strong className="block text-sm">Entrar no workspace {preview?.workspaceName || 'convidado'}</strong><span className="text-xs text-white/70">Vincula sua conta ao convite sem apagar seus outros workspaces.</span></span><LogIn className="h-5 w-5 text-[#66acd7]" /></button>
+          <button onClick={createWorkspace} disabled={working} className="flex items-center justify-between rounded-2xl border border-[#DDE3E8] px-5 py-4 text-left transition-colors hover:bg-[#F5F7F9] disabled:opacity-50"><span><strong className="block text-sm text-[#111111]">Criar meu workspace</strong><span className="text-xs text-[#6B7280]">Cria um novo ambiente e o torna ativo.</span></span><Plus className="h-5 w-5 text-[#2F6F9C]" /></button>
         </div>
       </div>
     </div>
