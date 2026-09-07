@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { getAdminClient } from '../_lib/supabaseAdmin.js';
 
+const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
+
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
   if (request.method !== 'POST') return response.status(405).json({ error: 'Método não permitido.' });
@@ -22,6 +24,16 @@ export default async function handler(request: any, response: any) {
     if (invitation.email && invitation.email.toLowerCase() !== (auth.user.email || '').toLowerCase()) {
       return response.status(403).json({ error: 'Este convite foi criado para outro e-mail.' });
     }
+
+    const { data: currentMembership } = await admin.from('workspace_members').select('user_id').eq('workspace_id', invitation.workspace_id).eq('user_id', auth.user.id).maybeSingle();
+    if (currentMembership) return response.status(200).json({ joined: true, alreadyMember: true });
+
+    const { data: workspaceProfiles, error: planError } = await admin.from('profiles').select('plan').eq('workspace_id', invitation.workspace_id);
+    if (planError) throw planError;
+    const planLimit = Math.max(1, ...(workspaceProfiles || []).map(item => PLAN_LIMITS[item.plan] || 1));
+    const { count: membersCount, error: countError } = await admin.from('workspace_members').select('*', { count: 'exact', head: true }).eq('workspace_id', invitation.workspace_id);
+    if (countError) throw countError;
+    if ((membersCount || 0) >= planLimit) return response.status(409).json({ error: `Esta equipe atingiu o limite de ${planLimit} usuário(s) do plano atual.` });
 
     const { data: profile } = await admin.from('profiles').select('workspace_id,name,email').eq('id', auth.user.id).maybeSingle();
     const previousWorkspace = profile?.workspace_id;
