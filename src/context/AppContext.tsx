@@ -29,7 +29,6 @@ import { entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } fr
 import { uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
 import { subscribeToWorkspaceRealtime, removeRealtimeChannel, RealtimeTable } from '../lib/realtimeRepository';
-import { callServerApi } from '../lib/serverApi';
 
 export interface ToastMessage {
   id: string;
@@ -115,7 +114,6 @@ interface AppContextType {
   sendMessage: (clientId: string, content: string, projectId?: string, mediaType?: 'text' | 'audio' | 'video' | 'file') => void;
   addTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => void;
   removeTeamMember: (id: string) => void;
-  inviteTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status' | 'avatar'>) => Promise<void>;
   toggleIntegration: (id: string) => void;
   
   // Authentication / persistence
@@ -1124,21 +1122,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('info', 'Membro Removido', 'O colaborador foi removido da equipe.');
   };
 
-  const inviteTeamMember = async (memberData: Omit<TeamMember, 'id' | 'projectsCount' | 'status' | 'avatar'>) => {
-    if (denyAction('manage:team')) throw new Error('Permissão insuficiente.');
-    const result = await callServerApi<{ inviteUrl: string; emailSent: boolean; emailWarning?: string }>('/api/team/invitations', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: memberData.name,
-        email: memberData.email,
-        jobTitle: memberData.role,
-        role: memberData.accessLevel,
-      }),
-    });
-    if (!result.emailSent) throw new Error(result.emailWarning || 'O e-mail não pôde ser enviado. Gere um link de convite.');
-    addToast('success', 'Convite enviado', `O link de acesso foi enviado para ${memberData.email}.`);
-  };
-
   // Integrations
   const toggleIntegration = (id: string) => {
     if (denyAction('manage:integrations')) return;
@@ -1219,7 +1202,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addCommunication,
         addTeamMember,
         removeTeamMember,
-        inviteTeamMember,
         toggleIntegration,
         isSupabaseConfigured,
         isAuthenticated: Boolean(authUserId),
