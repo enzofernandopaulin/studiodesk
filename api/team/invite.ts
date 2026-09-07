@@ -93,6 +93,7 @@ export default async function handler(request: any, response: any) {
     const member = {
       id: `tm_${invitedUserId}`,
       workspace_id: inviter.workspace_id,
+      user_id: invitedUserId,
       name,
       email,
       role: jobTitle,

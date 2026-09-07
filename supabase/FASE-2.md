@@ -14,7 +14,8 @@ A Fase 2 substitui o armazenamento do domínio inteiro em `workspace_states.stat
 - Auditoria: `timeline_events`.
 - Equipe e integrações: `team_members`, `integrations`.
 - RLS em todas as tabelas de domínio.
-- RPC `sync_workspace(jsonb)` para sincronização transacional do estado atual do frontend.
+- A antiga RPC `sync_workspace(jsonb)` foi removida pela migration de Prioridade 0;
+  o frontend persiste cada entidade separadamente.
 
 ## Como instalar
 

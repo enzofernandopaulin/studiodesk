@@ -50,7 +50,9 @@ Com Supabase configurado:
 
 ### Primeira inicialização
 
-Quando um usuário autenticado ainda não possui dados no banco, o aplicativo executa o `sync_workspace` uma única vez para semear o ambiente com os dados de demonstração. Depois disso, as operações normais deixam de usar o snapshot completo.
+Quando um usuário autenticado ainda não possui dados no banco, o bootstrap
+transacional cria apenas perfil, workspace, membership e a estrutura inicial.
+O snapshot destrutivo `sync_workspace` não é mais utilizado.
 
 ### Próxima evolução
 

@@ -36,6 +36,16 @@ No painel do Supabase, em **Authentication > URL Configuration**:
 
 O `schema.sql` já deve ter sido executado. Não é necessário executá-lo novamente se a criação anterior terminou com sucesso.
 
+Depois dele, execute uma vez, no SQL Editor:
+
+```text
+supabase/migrations/20260907_priority_zero_security.sql
+```
+
+Em seguida, execute `supabase/VERIFY-PRIORITY-ZERO.sql`. Todos os valores da
+coluna `ok` devem ser `true`. Essa verificação também confirma os controles que
+antes dependiam de `TEAM-INVITES.sql`.
+
 ## 4. Teste local
 
 ```bash
@@ -63,5 +73,7 @@ Verifique:
 - Table Editor > `profiles`: linha com o mesmo UUID do usuário;
 - `workspace_members`: membership com papel `admin`;
 - `workspaces`: workspace da empresa.
+- `workspaces.owner_id`: UUID do administrador que criou o workspace;
+- resultado de `VERIFY-PRIORITY-ZERO.sql`: todos os itens com `ok = true`.
 
 Se algo não aparecer, execute **somente** `supabase/DIAGNOSTICO-AUTH.sql` e confira as colunas `ok`, `has_profile` e `has_membership`.

@@ -3,7 +3,6 @@ import type { Session } from '@supabase/supabase-js';
 import {
   ActiveView,
   UserProfile,
-  PlanType,
   Lead,
   Client,
   Project,
@@ -22,9 +21,8 @@ import {
   Priority
 } from '../types';
 import { DEFAULT_KANBAN_COLUMNS } from '../data/defaults';
-import { getPlanDetails } from '../data/plans';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { loadProfile, loadWorkspace, saveProfile, saveWorkspace, WorkspaceState } from '../lib/workspaceRepository';
+import { loadProfile, loadWorkspace, saveProfile } from '../lib/workspaceRepository';
 import { entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
 import { uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
@@ -50,7 +48,6 @@ interface AppContextType {
   // User & Plan
   user: UserProfile;
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
-  setPlan: (plan: PlanType) => void;
   
   // Data lists
   leads: Lead[];
@@ -114,7 +111,7 @@ interface AppContextType {
   
   sendMessage: (clientId: string, content: string, projectId?: string, mediaType?: 'text' | 'audio' | 'video' | 'file') => void;
   addTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => void;
-  removeTeamMember: (id: string) => void;
+  removeTeamMember: (id: string) => Promise<void>;
   toggleIntegration: (id: string) => void;
   
   // Authentication / persistence
@@ -144,23 +141,6 @@ const EMPTY_USER: UserProfile = {
   companyName: '',
 };
 
-const EMPTY_WORKSPACE: WorkspaceState = {
-  leads: [],
-  clients: [],
-  projects: [],
-  tasks: [],
-  // Kanban columns are structural defaults for new workspaces.
-  kanbanColumns: DEFAULT_KANBAN_COLUMNS,
-  timelineEvents: [],
-  messages: [],
-  communications: [],
-  calendarEvents: [],
-  approvalRequests: [],
-  team: [],
-  integrations: [],
-};
-
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<ActiveView>('landing');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -176,13 +156,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const authDestinationRef = useRef<ActiveView | null>(null);
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [isHydrated, setIsHydrated] = useState(!isSupabaseConfigured);
+  const [profilePersistenceReady, setProfilePersistenceReady] = useState(false);
 
   const [user, setUserState] = useState<UserProfile>(EMPTY_USER);
   const setUser: React.Dispatch<React.SetStateAction<UserProfile>> = (update) => {
     setUserState(prev => {
       const candidate = typeof update === 'function' ? (update as (p: UserProfile) => UserProfile)(prev) : update;
-      // role, id and email are identity fields controlled by Auth/membership, not by UI forms.
-      return { ...candidate, id: prev.id, email: prev.email, role: prev.role };
+      // Identity, authorization and billing fields are controlled by the server.
+      return { ...candidate, id: prev.id, email: prev.email, role: prev.role, plan: prev.plan };
     });
   };
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -198,26 +179,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [team, setTeam] = useState<TeamMember[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
 
-
-  const buildWorkspaceState = (): WorkspaceState => ({
-    leads,
-    clients,
-    projects,
-    tasks,
-    kanbanColumns,
-    timelineEvents,
-    messages,
-    communications,
-    calendarEvents,
-    approvalRequests,
-    team,
-    integrations,
-  });
-
   const loadAuthenticatedData = async (userId: string) => {
     if (!supabase) return;
 
     try {
+      setProfilePersistenceReady(false);
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
       await callServerApi('/api/session/bootstrap', { method: 'POST' });
@@ -236,46 +202,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...profile,
       }));
 
-      if (!workspace) {
-        // Primeiro acesso em produção: cria somente a estrutura mínima do workspace.
-        // Nenhum dado de cliente ou projeto é criado automaticamente para uma conta nova.
-        await saveWorkspace(userId, EMPTY_WORKSPACE);
-        setLeads([]);
-        setClients([]);
-        setProjects([]);
-        setTasks([]);
-        setKanbanColumns(DEFAULT_KANBAN_COLUMNS);
-        setTimelineEvents([]);
-        setMessages([]);
-        setCommunications([]);
-        setCalendarEvents([]);
-        setApprovalRequests([]);
-        setTeam([]);
-        setIntegrations([]);
-      } else {
-        setLeads(workspace.leads ?? []);
-        setClients(workspace.clients ?? []);
-        setProjects(workspace.projects ?? []);
-        setTasks(workspace.tasks ?? []);
-        setKanbanColumns(workspace.kanbanColumns ?? []);
-        setTimelineEvents(workspace.timelineEvents ?? []);
-        setMessages(workspace.messages ?? []);
-        setCommunications(workspace.communications ?? []);
-        setCalendarEvents(workspace.calendarEvents ?? []);
-        setApprovalRequests(workspace.approvalRequests ?? []);
-        setTeam(workspace.team ?? []);
-        setIntegrations(workspace.integrations ?? []);
+      if (!workspace) throw new Error('Workspace não encontrado após a recuperação da sessão.');
+
+      const columns = workspace.kanbanColumns?.length ? workspace.kanbanColumns : DEFAULT_KANBAN_COLUMNS;
+      if (!workspace.kanbanColumns?.length) {
+        await Promise.all(columns.map(column => entityRepository.column.upsert(userId, column)));
       }
+      setLeads(workspace.leads ?? []);
+      setClients(workspace.clients ?? []);
+      setProjects(workspace.projects ?? []);
+      setTasks(workspace.tasks ?? []);
+      setKanbanColumns(columns);
+      setTimelineEvents(workspace.timelineEvents ?? []);
+      setMessages(workspace.messages ?? []);
+      setCommunications(workspace.communications ?? []);
+      setCalendarEvents(workspace.calendarEvents ?? []);
+      setApprovalRequests(workspace.approvalRequests ?? []);
+      setTeam(workspace.team ?? []);
+      setIntegrations(workspace.integrations ?? []);
 
       setAuthUserId(userId);
       setIsHydrated(true);
+      setProfilePersistenceReady(true);
       return !profile.businessType || !profile.teamSize;
     } catch (error) {
       console.error('StudioDesk: falha ao carregar dados do Supabase', error);
       const message = error instanceof Error ? error.message : 'Não foi possível carregar seu workspace.';
       addToast('error', 'Falha ao carregar a nuvem', `${message} Sua sessão foi mantida para que você possa tentar novamente ou aceitar um convite.`);
       setAuthUserId(userId);
-      setUserState(prev => ({ ...prev, id: userId }));
+      setUserState({ ...EMPTY_USER, id: userId });
       setLeads([]);
       setClients([]);
       setProjects([]);
@@ -289,6 +244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTeam([]);
       setIntegrations([]);
       setIsHydrated(true);
+      setProfilePersistenceReady(false);
       return true;
     }
   };
@@ -305,6 +261,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       if (!session?.user) {
         setAuthUserId(null);
+        setProfilePersistenceReady(false);
         setUserState(EMPTY_USER);
         setLeads([]);
         setClients([]);
@@ -371,12 +328,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Fase 3: cada mutação de domínio persiste diretamente na tabela correspondente.
   // Mantemos apenas a persistência de perfil separada, pois o onboarding altera esse objeto.
   useEffect(() => {
-    if (!supabase || !authUserId || !isHydrated) return;
+    if (!supabase || !authUserId || !isHydrated || !profilePersistenceReady) return;
     const timer = window.setTimeout(() => {
       void saveProfile(user).catch(error => console.error('StudioDesk: falha ao salvar perfil', error));
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [authUserId, isHydrated, user]);
+  }, [authUserId, isHydrated, profilePersistenceReady, user]);
 
   const persist = (operation: Promise<void>, message = 'A alteração não pôde ser sincronizada com a nuvem.') => {
     if (!supabase || !authUserId) return;
@@ -577,12 +534,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setTimelineEvents(prev => [newEvt, ...prev]);
     persist(entityRepository.timeline.upsert(authUserId || '', newEvt), 'A atividade foi registrada localmente, mas não pôde ser sincronizada.');
-  };
-
-  const setPlan = (plan: PlanType) => {
-    const details = getPlanDetails(plan);
-    setUser(prev => ({ ...prev, plan }));
-    addToast('info', `Plano ${details.name} Ativo`, `${details.icon} Modo ${details.name} (${details.userLimitText}) ativado com sucesso.`);
   };
 
   // Lead CRUD
@@ -1120,11 +1071,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', 'Membro Adicionado', `${newMember.name} foi adicionado à equipe com sucesso.`);
   };
 
-  const removeTeamMember = (id: string) => {
+  const removeTeamMember = async (id: string) => {
     if (denyAction('manage:team')) return;
-    setTeam(prev => prev.filter(m => m.id !== id));
-    persist(entityRepository.team.delete(authUserId || '', id), 'O membro foi removido da tela, mas a nuvem não confirmou a exclusão.');
-    addToast('info', 'Membro Removido', 'O colaborador foi removido da equipe.');
+    await callServerApi('/api/team/members', {
+      method: 'DELETE',
+      body: JSON.stringify({ memberId: id }),
+    });
+    setTeam(prev => prev.filter(member => member.id !== id));
+    addToast('info', 'Acesso removido', 'O membro foi removido da equipe e perdeu o acesso ao workspace.');
   };
 
   // Integrations
@@ -1155,7 +1109,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSelectedProjectId,
         user,
         setUser,
-        setPlan,
         leads,
         clients,
         projects,

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Users, Plus, Shield, Trash2, CheckCircle2, X, Sparkles, AlertCircle, Link2, Copy } from 'lucide-react';
-import { TeamMember } from '../../types';
+import { X, Sparkles, Link2, Copy } from 'lucide-react';
 import { getPlanDetails } from '../../data/plans';
 import { callServerApi } from '../../lib/serverApi';
 
@@ -9,10 +8,11 @@ export const TeamView: React.FC = () => {
   const { team, removeTeamMember, user, setCurrentView, addToast } = useApp();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [teamName, setTeamName] = useState(user.companyName || 'Minha Equipe');
-  const [linkPermission, setLinkPermission] = useState<'admin' | 'gestor' | 'colaborador'>('colaborador');
+  const [linkPermission, setLinkPermission] = useState<'gestor' | 'colaborador'>('colaborador');
   const [inviteLink, setInviteLink] = useState('');
   const [inviteMaxUses, setInviteMaxUses] = useState(0);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
   const planDetails = getPlanDetails(user.plan);
   const currentMembersCount = team.length;
@@ -37,6 +37,19 @@ export const TeamView: React.FC = () => {
   const copyInviteLink = async () => {
     await navigator.clipboard.writeText(inviteLink);
     addToast('success', 'Link copiado', 'Agora envie o link aos seus colegas.');
+  };
+
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (removingMemberId) return;
+    if (!window.confirm(`Remover ${memberName} da equipe e revogar o acesso ao workspace?`)) return;
+    setRemovingMemberId(memberId);
+    try {
+      await removeTeamMember(memberId);
+    } catch (error) {
+      addToast('error', 'Membro não removido', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setRemovingMemberId(null);
+    }
   };
 
   return (
@@ -116,14 +129,13 @@ export const TeamView: React.FC = () => {
 
             <div className="pt-3 border-t border-[#DDE3E8] flex items-center justify-between">
               <span className="text-[10px] text-[#6B7280]">Acesso ao StudioDesk Ativo</span>
-              {member.id !== 'tm_1' && (
-                <button
-                  onClick={() => removeTeamMember(member.id)}
-                  className="text-xs text-rose-600 hover:text-rose-800 font-semibold"
-                >
-                  Remover
-                </button>
-              )}
+              <button
+                onClick={() => void handleRemoveMember(member.id, member.name)}
+                disabled={removingMemberId === member.id}
+                className="text-xs text-rose-600 hover:text-rose-800 disabled:text-gray-400 font-semibold"
+              >
+                {removingMemberId === member.id ? 'Removendo...' : 'Remover'}
+              </button>
             </div>
           </div>
         ))}
@@ -135,7 +147,7 @@ export const TeamView: React.FC = () => {
             <div className="flex items-center justify-between border-b border-[#DDE3E8] pb-3"><h3 className="font-display text-lg font-black uppercase">Criar equipe e link</h3><button onClick={() => setIsLinkModalOpen(false)}><X className="w-5 h-5" /></button></div>
             {!inviteLink ? <form onSubmit={handleCreateTeamLink} className="space-y-4">
               <div><label className="block text-xs font-bold mb-1">Nome da equipe</label><input required value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm" /></div>
-              <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Administrador</option></select></div>
+              <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option></select><p className="mt-1.5 text-[10px] text-[#6B7280]">Acesso de administrador não pode ser concedido por link reutilizável.</p></div>
               <button disabled={isGeneratingLink} className="w-full bg-[#111111] text-white font-bold text-sm py-3 rounded-xl disabled:bg-gray-400">{isGeneratingLink ? 'Criando...' : 'Criar equipe e gerar link'}</button>
             </form> : <div className="space-y-4"><p className="text-sm text-[#6B7280]">Envie este link aos seus colegas. Ele expira em 7 dias e aceita até {inviteMaxUses} {inviteMaxUses === 1 ? 'entrada' : 'entradas'}, conforme as vagas restantes do plano.</p><div className="break-all rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] p-3 text-xs">{inviteLink}</div><button onClick={copyInviteLink} className="w-full flex items-center justify-center gap-2 bg-[#111111] text-white font-bold text-sm py-3 rounded-xl"><Copy className="w-4 h-4 text-[#66acd7]" />Copiar link</button></div>}
           </div>

@@ -47,6 +47,14 @@ as $$
 declare
   membership_role text;
 begin
+  if auth.role() = 'service_role' then
+    return new;
+  end if;
+
+  new.id := old.id;
+  new.email := old.email;
+  new.plan := old.plan;
+
   select wm.role into membership_role
   from public.workspace_members wm
   where wm.user_id = old.id
@@ -59,7 +67,6 @@ begin
   else
     new.role := membership_role;
   end if;
-  new.id := old.id;
   return new;
 end;
 $$;

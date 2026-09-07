@@ -6,14 +6,17 @@ import { PlanType } from '../../types';
 import { PLANS_LIST } from '../../data/plans';
 
 export const ProfileSelection: React.FC = () => {
-  const { user, setUser, setPlan, setCurrentView, addToast } = useApp();
+  const { user, setCurrentView, addToast } = useApp();
 
   const handleSelect = (selectedPlan: PlanType) => {
-    setPlan(selectedPlan);
-    setUser(prev => ({ ...prev, plan: selectedPlan }));
+    const activePlan = user.plan === 'individual' ? 'solo' : user.plan;
+    if (selectedPlan !== activePlan) {
+      addToast('warning', 'Plano indisponível', 'A alteração de plano exige uma assinatura confirmada.');
+      return;
+    }
     addToast(
       'info',
-      `Perfil ${selectedPlan.toUpperCase()} Selecionado`,
+      `Plano ${selectedPlan.toUpperCase()} Confirmado`,
       'Vamos personalizar seu onboarding com as melhores práticas para sua rotina.'
     );
     setCurrentView('onboarding');
@@ -25,7 +28,7 @@ export const ProfileSelection: React.FC = () => {
         <div className="text-center space-y-2">
           <Logo size="lg" className="mx-auto" />
           <h1 className="font-display text-3xl sm:text-4xl font-black text-[#111111] uppercase tracking-tight pt-2">
-            Escolha seu Plano & Perfil de Operação
+            Confirme seu Plano & Perfil de Operação
           </h1>
           <p className="text-sm text-[#6B7280] max-w-lg mx-auto">
             Sua escolha ajusta automaticamente a capacidade da equipe, a estrutura do Kanban e os recursos do StudioDesk.
@@ -35,13 +38,14 @@ export const ProfileSelection: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {PLANS_LIST.map((p) => {
             const isSelected = user.plan === p.id || (user.plan === 'individual' && p.id === 'solo');
-            const isDark = p.id === 'studio' || p.id === 'empresa';
+            const isLocked = !isSelected;
 
             return (
               <div
                 key={p.id}
                 onClick={() => handleSelect(p.id)}
-                className={`p-6 rounded-3xl border-2 transition-all cursor-pointer hover:shadow-xl group flex flex-col justify-between space-y-5 ${
+                aria-disabled={isLocked}
+                className={`p-6 rounded-3xl border-2 transition-all group flex flex-col justify-between space-y-5 ${isLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:shadow-xl'} ${
                   p.id === 'studio'
                     ? 'bg-[#111111] text-white border-[#66acd7] ring-2 ring-[#66acd7]/30 relative'
                     : 'bg-white text-[#111111] border-[#DDE3E8] hover:border-[#66acd7]'
@@ -97,13 +101,15 @@ export const ProfileSelection: React.FC = () => {
                 </div>
 
                 <button
+                  type="button"
+                  disabled={isLocked}
                   className={`w-full font-bold text-xs py-3 rounded-xl transition-colors flex items-center justify-center gap-1.5 ${
                     p.id === 'studio'
                       ? 'bg-[#66acd7] hover:bg-[#529dc9] text-[#111111]'
                       : 'bg-[#F5F7F9] group-hover:bg-[#111111] text-[#111111] group-hover:text-white'
                   }`}
                 >
-                  <span>Selecionar {p.name}</span>
+                  <span>{isLocked ? 'Disponível após assinatura' : `Continuar com ${p.name}`}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>

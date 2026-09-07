@@ -27,7 +27,12 @@ No SQL Editor do projeto, execute:
 
 ```text
 supabase/schema.sql
+supabase/migrations/20260907_priority_zero_security.sql
 ```
+
+Em projetos já existentes, execute apenas a migration de segurança mais recente.
+Ela remove a RPC destrutiva antiga, instala o bootstrap transacional, protege
+planos e permissões e aplica os controles necessários aos convites de equipe.
 
 ### 3. Configure as variáveis
 
@@ -74,7 +79,10 @@ O StudioDesk utiliza Supabase Realtime com um canal multiplexado por workspace p
 
 A camada server-side da Vercel foi adicionada em `api/`. O frontend continua com Supabase Auth/RLS, enquanto operações que exigem contexto server-side usam Serverless Functions. A chave `SUPABASE_SERVICE_ROLE_KEY` é estritamente server-only.
 
-Endpoints base: `/api/health`, `/api/me` e `/api/storage/signed-url`. Webhooks de terceiros serão adicionados apenas quando cada integração tiver sua validação de assinatura e contrato de entrada definidos.
+Endpoints base: `/api/health`, `/api/me`, `/api/session/bootstrap`,
+`/api/team/members` e `/api/storage/signed-url`. Webhooks de terceiros serão
+adicionados apenas quando cada integração tiver sua validação de assinatura e
+contrato de entrada definidos.
 
 ## Segurança — Fase 8
 

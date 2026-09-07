@@ -21,6 +21,7 @@ export default async function handler(request: any, response: any) {
     if (error || !invitation) return response.status(404).json({ error: 'Convite não encontrado.' });
     if (invitation.uses_count >= invitation.max_uses) return response.status(409).json({ error: 'Este convite atingiu o limite de entradas.' });
     if (new Date(invitation.expires_at).getTime() < Date.now()) return response.status(410).json({ error: 'Este convite expirou.' });
+    if (invitation.role === 'admin') return response.status(403).json({ error: 'Convites por link não podem conceder acesso de administrador.' });
     if (invitation.email && invitation.email.toLowerCase() !== (auth.user.email || '').toLowerCase()) {
       return response.status(403).json({ error: 'Este convite foi criado para outro e-mail.' });
     }
@@ -56,7 +57,7 @@ export default async function handler(request: any, response: any) {
     if (profileError) throw profileError;
     await admin.from('workspace_invitations').update({ accepted_by: auth.user.id, accepted_at: new Date().toISOString(), uses_count: invitation.uses_count + 1 }).eq('id', invitation.id).eq('uses_count', invitation.uses_count);
     await admin.from('team_members').upsert({
-      id: `tm_${auth.user.id}`, workspace_id: invitation.workspace_id,
+      id: `tm_${auth.user.id}`, workspace_id: invitation.workspace_id, user_id: auth.user.id,
       name: profile?.name || invitation.invited_name || auth.user.user_metadata?.name || auth.user.email || 'Membro',
       email: auth.user.email || '', role: invitation.job_title || 'Membro da equipe', access_level: invitation.role,
       avatar: '', projects_count: 0, status: 'ativo',
@@ -67,7 +68,7 @@ export default async function handler(request: any, response: any) {
     console.error('POST /api/team/join failed', error);
     const message = error instanceof Error ? error.message : '';
     if (/column .*plan|column .*invited_name|column .*job_title|schema cache/i.test(message)) {
-      return response.status(503).json({ error: 'O banco ainda não recebeu a atualização de equipes. Execute supabase/MULTI-WORKSPACE.sql no Supabase.' });
+      return response.status(503).json({ error: 'O banco ainda não recebeu a migration de segurança mais recente.' });
     }
     if (/Configure uma URL Supabase válida|SUPABASE_SERVICE_ROLE_KEY/i.test(message)) {
       return response.status(503).json({ error: 'As variáveis privadas do Supabase não estão configuradas corretamente na Vercel.' });

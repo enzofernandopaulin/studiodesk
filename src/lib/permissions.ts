@@ -14,7 +14,9 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     'view:team','manage:crm','manage:projects','manage:tasks','manage:approvals',
     'manage:calendar','manage:communication','manage:kanban'
   ],
-  colaborador: ['manage:tasks','manage:approvals','manage:calendar','manage:communication']
+  // Mirrors the database RLS: collaborators can operate tasks and communication,
+  // while CRM, calendar and approval mutations require a manager or admin.
+  colaborador: ['manage:tasks','manage:communication']
 };
 
 export const can = (role: UserRole, permission: Permission) => rolePermissions[role]?.includes(permission) ?? false;

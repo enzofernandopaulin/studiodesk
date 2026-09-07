@@ -85,9 +85,6 @@ export async function loadWorkspace(userId: string): Promise<Partial<WorkspaceSt
   const failed = result.find(r => r.error);
   if (failed?.error) throw failed.error;
 
-  const hasData = result.some(r => (r.data ?? []).length > 0);
-  if (!hasData) return null;
-
   const projectRows = projects.data ?? [];
   const clientNames = new Map((clients.data ?? []).map(c => [c.id, c.company || c.name]));
   const mediaByProject = new Map((media.data ?? []).map(m => [m.project_id, m]));
@@ -109,12 +106,6 @@ export async function loadWorkspace(userId: string): Promise<Partial<WorkspaceSt
   };
 }
 
-export async function saveWorkspace(_userId: string, state: WorkspaceState): Promise<void> {
-  if (!supabase) return;
-  const { error } = await supabase.rpc('sync_workspace', { payload: state });
-  if (error) throw error;
-}
-
 export async function loadProfile(userId: string): Promise<Partial<UserProfile> | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('profiles').select('name,email,avatar,role,plan,business_type,team_size,objectives,template,company_name').eq('id', userId).maybeSingle();
@@ -125,13 +116,15 @@ export async function loadProfile(userId: string): Promise<Partial<UserProfile> 
 
 export async function saveProfile(user: UserProfile): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.from('profiles').upsert({ id:user.id,name:user.name,email:user.email,avatar:user.avatar,role:user.role,plan:user.plan,business_type:user.businessType,team_size:user.teamSize,objectives:user.objectives,template:user.template,company_name:user.companyName,updated_at:new Date().toISOString() }, { onConflict:'id' });
+  const { error } = await supabase.from('profiles').update({
+    name: user.name,
+    avatar: user.avatar,
+    business_type: user.businessType,
+    team_size: user.teamSize,
+    objectives: user.objectives,
+    template: user.template,
+    company_name: user.companyName,
+    updated_at: new Date().toISOString(),
+  }).eq('id', user.id);
   if (error) throw error;
-}
-
-export async function ensureWorkspace(user: UserProfile, state: WorkspaceState): Promise<void> {
-  if (!supabase) return;
-  await saveProfile(user);
-  const existing = await loadWorkspace(user.id);
-  if (!existing) await saveWorkspace(user.id, state);
 }
