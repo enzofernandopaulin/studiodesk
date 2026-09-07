@@ -479,7 +479,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       password,
       options: {
         data: { name, company_name: companyName },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: window.location.href.split('#')[0],
       },
     });
 
@@ -1120,17 +1120,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const inviteTeamMember = async (memberData: Omit<TeamMember, 'id' | 'projectsCount' | 'status' | 'avatar'>) => {
     if (denyAction('manage:team')) throw new Error('Permissão insuficiente.');
-    const result = await callServerApi<{ invited: true; member: TeamMember }>('/api/team/invite', {
+    const result = await callServerApi<{ inviteUrl: string; emailSent: boolean; emailWarning?: string }>('/api/team/invitations', {
       method: 'POST',
       body: JSON.stringify({
         name: memberData.name,
         email: memberData.email,
-        jobTitle: memberData.role,
         role: memberData.accessLevel,
       }),
     });
-    setTeam(prev => [...prev.filter(item => item.id !== result.member.id), result.member]);
-    addToast('success', 'Convite Enviado', `Convite enviado para ${result.member.email}.`);
+    if (!result.emailSent) throw new Error(result.emailWarning || 'O e-mail não pôde ser enviado. Gere um link de convite.');
+    addToast('success', 'Convite enviado', `O link de acesso foi enviado para ${memberData.email}.`);
   };
 
   // Integrations
