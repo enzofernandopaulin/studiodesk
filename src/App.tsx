@@ -21,6 +21,7 @@ import { ActivitiesView } from './components/activities/ActivitiesView';
 import { CommunicationHubView } from './components/communication/CommunicationHubView';
 import { IntegrationsView } from './components/integrations/IntegrationsView';
 import { TeamView } from './components/team/TeamView';
+import { TeamInviteJoin } from './components/team/TeamInviteJoin';
 import { SettingsView } from './components/settings/SettingsView';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
@@ -142,6 +143,7 @@ export const App: React.FC = () => {
       <ToastContainer />
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <InvitePasswordSetup />
+      <TeamInviteJoin />
 
       <LeadModal
         isOpen={isLeadModalOpen}
