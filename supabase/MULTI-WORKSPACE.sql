@@ -1,6 +1,12 @@
 -- Execute uma vez no SQL Editor do Supabase.
 -- Permite uma conta em vários workspaces e mantém um workspace ativo no perfil.
 
+alter table public.workspace_invitations
+  add column if not exists invited_name text;
+
+alter table public.workspace_invitations
+  add column if not exists job_title text;
+
 alter table public.workspaces
   add column if not exists owner_id uuid references auth.users(id) on delete set null;
 
