@@ -91,24 +91,44 @@ export default async function handler(request: any, response: any) {
     let emailWarning = '';
     if (email) {
       const { data: inviterProfile } = await admin.from('profiles').select('name').eq('id', auth.user.id).maybeSingle();
-      try {
-        await sendInviteEmail({
-          to: email,
-          recipientName,
-          inviterName: inviterProfile?.name || auth.user.email || 'StudioDesk',
-          workspaceName: teamName || workspacePlan.name || 'StudioDesk',
-          role,
-          inviteUrl,
+      const resendKey = String(process.env.RESEND_API_KEY || '').trim();
+      const resendFrom = String(process.env.INVITE_FROM_EMAIL || '').trim();
+      const hasCustomSender = Boolean(resendKey && resendFrom && !/@(?:gmail|outlook|hotmail|yahoo)\./i.test(resendFrom));
+      if (hasCustomSender) {
+        try {
+          await sendInviteEmail({
+            to: email,
+            recipientName,
+            inviterName: inviterProfile?.name || auth.user.email || 'StudioDesk',
+            workspaceName: teamName || workspacePlan.name || 'StudioDesk',
+            role,
+            inviteUrl,
+          });
+          emailSent = true;
+        } catch (sendError) {
+          console.error('Workspace invitation email failed', sendError);
+          emailWarning = 'O provedor de e-mail recusou o envio. Confira o remetente e os logs da Resend.';
+        }
+      } else {
+        const { error: magicLinkError } = await admin.auth.signInWithOtp({
+          email,
+          options: {
+            shouldCreateUser: true,
+            emailRedirectTo: inviteUrl,
+            data: {
+              invited_workspace_id: membership.workspace_id,
+              invited_name: recipientName,
+              job_title: jobTitle,
+            },
+          },
         });
-        emailSent = true;
-      } catch (sendError) {
-        console.error('Workspace invitation email failed', sendError);
-        const sendMessage = sendError instanceof Error ? sendError.message : '';
-        emailWarning = sendMessage.includes('RESEND_API_KEY_NOT_CONFIGURED')
-          ? 'Configure RESEND_API_KEY na Vercel para enviar convites por e-mail.'
-          : sendMessage.includes('INVITE_FROM_EMAIL_NOT_CONFIGURED')
-            ? 'Configure INVITE_FROM_EMAIL na Vercel com um remetente autorizado.'
-            : 'O provedor de e-mail recusou o envio. Confira o domínio e os logs da Resend.';
+        emailSent = !magicLinkError;
+        if (magicLinkError) {
+          console.error('Supabase invitation magic link failed', magicLinkError);
+          emailWarning = /rate limit/i.test(magicLinkError.message)
+            ? 'O limite de e-mails do Supabase foi atingido. Configure o SMTP personalizado em Authentication > SMTP Settings.'
+            : `O Supabase não enviou o e-mail: ${magicLinkError.message}`;
+        }
       }
     }
 
