@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Users, Plus, Mail, Shield, Trash2, CheckCircle2, UserPlus, X, Sparkles, AlertCircle } from 'lucide-react';
+import { Users, Plus, Mail, Shield, Trash2, CheckCircle2, UserPlus, X, Sparkles, AlertCircle, Link2, Copy } from 'lucide-react';
 import { TeamMember } from '../../types';
 import { getPlanDetails } from '../../data/plans';
+import { callServerApi } from '../../lib/serverApi';
 
 export const TeamView: React.FC = () => {
   const { team, inviteTeamMember, removeTeamMember, user, setCurrentView, addToast } = useApp();
@@ -12,6 +13,11 @@ export const TeamView: React.FC = () => {
   const [email, setEmail] = useState('');
   const [permission, setPermission] = useState<'admin' | 'gestor' | 'colaborador'>('gestor');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+  const [teamName, setTeamName] = useState(user.companyName || 'Minha Equipe');
+  const [linkPermission, setLinkPermission] = useState<'admin' | 'gestor' | 'colaborador'>('colaborador');
+  const [inviteLink, setInviteLink] = useState('');
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
 
   const planDetails = getPlanDetails(user.plan);
   const currentMembersCount = team.length;
@@ -34,6 +40,25 @@ export const TeamView: React.FC = () => {
     }
   };
 
+  const handleCreateTeamLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsGeneratingLink(true);
+    try {
+      const result = await callServerApi<{ inviteUrl: string }>('/api/team/invitations', {
+        method: 'POST', body: JSON.stringify({ teamName: teamName.trim(), role: linkPermission }),
+      });
+      setInviteLink(result.inviteUrl);
+      addToast('success', 'Equipe pronta', 'O link de entrada foi criado e vale por 7 dias.');
+    } catch (error) {
+      addToast('error', 'Link não criado', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally { setIsGeneratingLink(false); }
+  };
+
+  const copyInviteLink = async () => {
+    await navigator.clipboard.writeText(inviteLink);
+    addToast('success', 'Link copiado', 'Agora envie o link aos seus colegas.');
+  };
+
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-6" id="team-view">
       {/* Header */}
@@ -47,13 +72,10 @@ export const TeamView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2 self-start sm:self-auto"
-        >
-          <UserPlus className="w-4 h-4 text-[#66acd7]" />
-          <span>Convidar Membro</span>
-        </button>
+        <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+          <button onClick={() => { setInviteLink(''); setIsLinkModalOpen(true); }} className="border border-[#2F6F9C] bg-white text-[#2F6F9C] font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"><Link2 className="w-4 h-4" />Criar equipe por link</button>
+          <button onClick={() => setIsModalOpen(true)} className="bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2"><UserPlus className="w-4 h-4 text-[#66acd7]" /><span>Convidar por e-mail</span></button>
+        </div>
       </div>
 
       {/* Plan Capacity Bar */}
@@ -127,6 +149,19 @@ export const TeamView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {isLinkModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white rounded-3xl border border-[#DDE3E8] shadow-2xl p-6 space-y-5">
+            <div className="flex items-center justify-between border-b border-[#DDE3E8] pb-3"><h3 className="font-display text-lg font-black uppercase">Criar equipe e link</h3><button onClick={() => setIsLinkModalOpen(false)}><X className="w-5 h-5" /></button></div>
+            {!inviteLink ? <form onSubmit={handleCreateTeamLink} className="space-y-4">
+              <div><label className="block text-xs font-bold mb-1">Nome da equipe</label><input required value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm" /></div>
+              <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Administrador</option></select></div>
+              <button disabled={isGeneratingLink} className="w-full bg-[#111111] text-white font-bold text-sm py-3 rounded-xl disabled:bg-gray-400">{isGeneratingLink ? 'Criando...' : 'Criar equipe e gerar link'}</button>
+            </form> : <div className="space-y-4"><p className="text-sm text-[#6B7280]">Envie este link aos seus colegas. Ele expira em 7 dias e aceita até 25 entradas.</p><div className="break-all rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] p-3 text-xs">{inviteLink}</div><button onClick={copyInviteLink} className="w-full flex items-center justify-center gap-2 bg-[#111111] text-white font-bold text-sm py-3 rounded-xl"><Copy className="w-4 h-4 text-[#66acd7]" />Copiar link</button></div>}
+          </div>
+        </div>
+      )}
 
       {/* Invite Member Modal */}
       {isModalOpen && (
