@@ -21,6 +21,7 @@ import {
 import { Logo } from '../common/Logo';
 import { BrandCardModal } from '../common/BrandCardModal';
 import { getPlanDetails } from '../../data/plans';
+import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 
 interface HeaderProps {
   onOpenMobileMenu?: () => void;
@@ -95,6 +96,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCre
               </span>
             );
           })()}
+          <WorkspaceSwitcher />
         </div>
       </div>
 
