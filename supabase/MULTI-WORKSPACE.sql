@@ -1,4 +1,6 @@
--- Execute uma vez no SQL Editor do Supabase.
+-- ARQUIVO LEGADO. Não execute isoladamente.
+-- Use supabase/CORRECAO-WORKSPACES-E-CONVITES.sql, que contém a correção completa.
+-- Mantido apenas como histórico da primeira migração multi-workspace.
 -- Permite uma conta em vários workspaces e mantém um workspace ativo no perfil.
 
 alter table public.workspace_invitations
@@ -47,14 +49,6 @@ as $$
 declare
   membership_role text;
 begin
-  if auth.role() = 'service_role' then
-    return new;
-  end if;
-
-  new.id := old.id;
-  new.email := old.email;
-  new.plan := old.plan;
-
   select wm.role into membership_role
   from public.workspace_members wm
   where wm.user_id = old.id
@@ -67,6 +61,7 @@ begin
   else
     new.role := membership_role;
   end if;
+  new.id := old.id;
   return new;
 end;
 $$;
