@@ -1,18 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Users, Plus, Mail, Shield, Trash2, CheckCircle2, UserPlus, X, Sparkles, AlertCircle, Link2, Copy } from 'lucide-react';
+import { Users, Plus, Shield, Trash2, CheckCircle2, X, Sparkles, AlertCircle, Link2, Copy } from 'lucide-react';
 import { TeamMember } from '../../types';
 import { getPlanDetails } from '../../data/plans';
 import { callServerApi } from '../../lib/serverApi';
 
 export const TeamView: React.FC = () => {
-  const { team, inviteTeamMember, removeTeamMember, user, setCurrentView, addToast } = useApp();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [name, setName] = useState('');
-  const [role, setRole] = useState('Editor & Motion Designer');
-  const [email, setEmail] = useState('');
-  const [permission, setPermission] = useState<'admin' | 'gestor' | 'colaborador'>('gestor');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { team, removeTeamMember, user, setCurrentView, addToast } = useApp();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [teamName, setTeamName] = useState(user.companyName || 'Minha Equipe');
   const [linkPermission, setLinkPermission] = useState<'admin' | 'gestor' | 'colaborador'>('colaborador');
@@ -24,22 +18,6 @@ export const TeamView: React.FC = () => {
   const currentMembersCount = team.length;
   const isSoloPlan = user.plan === 'solo' || user.plan === 'individual';
   const isCapacityReached = currentMembersCount >= planDetails.userLimit;
-
-  const handleAddMember = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !email.trim() || isSubmitting) return;
-    setIsSubmitting(true);
-    try {
-      await inviteTeamMember({ name: name.trim(), role: role.trim(), email: email.trim(), accessLevel: permission });
-      setName('');
-      setEmail('');
-      setIsModalOpen(false);
-    } catch (error) {
-      addToast('error', 'Convite não enviado', error instanceof Error ? error.message : 'Tente novamente.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const handleCreateTeamLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,8 +53,7 @@ export const TeamView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-          <button disabled={isCapacityReached || isSoloPlan} onClick={() => { setInviteLink(''); setInviteMaxUses(0); setIsLinkModalOpen(true); }} className="border border-[#2F6F9C] bg-white disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-300 disabled:cursor-not-allowed text-[#2F6F9C] font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"><Link2 className="w-4 h-4" />Criar equipe por link</button>
-          <button onClick={() => setIsModalOpen(true)} className="bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl transition-all shadow-xs flex items-center gap-2"><UserPlus className="w-4 h-4 text-[#66acd7]" /><span>Convidar por e-mail</span></button>
+          <button disabled={isCapacityReached || isSoloPlan} onClick={() => { setInviteLink(''); setInviteMaxUses(0); setIsLinkModalOpen(true); }} className="bg-[#111111] hover:bg-[#2F6F9C] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-xl flex items-center gap-2"><Link2 className="w-4 h-4 text-[#66acd7]" />Gerar link de convite</button>
         </div>
       </div>
 
@@ -165,89 +142,6 @@ export const TeamView: React.FC = () => {
         </div>
       )}
 
-      {/* Invite Member Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-white rounded-3xl border border-[#DDE3E8] shadow-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-[#DDE3E8] pb-3">
-              <h3 className="font-display text-lg font-black text-[#111111] uppercase tracking-tight">
-                Convidar Novo Membro
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 text-[#6B7280] hover:text-[#111111]">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddMember} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#111111] mb-1">Nome Completo</label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Ex: Matheus Silveira"
-                  className="w-full px-3 py-2 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#111111] mb-1">Cargo / Especialidade</label>
-                <input
-                  type="text"
-                  required
-                  value={role}
-                  onChange={e => setRole(e.target.value)}
-                  placeholder="Ex: Filmmaker / Diretor de Fotografia"
-                  className="w-full px-3 py-2 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#111111] mb-1">E-mail de Acesso</label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="matheus@empresa.com.br"
-                  className="w-full px-3 py-2 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#111111] mb-1">Nível de Permissão</label>
-                <select
-                  value={permission}
-                  onChange={e => setPermission(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none"
-                >
-                  <option value="gestor">Gestor (Gerencia tarefas e projetos)</option>
-                  <option value="colaborador">Colaborador (CRM e comunicação)</option>
-                  <option value="admin">Administrador (Controle total de configurações)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#DDE3E8]">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-[#6B7280] hover:text-[#111111]"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting || isCapacityReached || isSoloPlan}
-                  className="bg-[#111111] hover:bg-[#2F6F9C] disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors"
-                >
-                  {isSubmitting ? 'Enviando...' : 'Enviar Convite'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
