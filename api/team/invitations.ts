@@ -44,9 +44,9 @@ export default async function handler(request: any, response: any) {
     const membership = await getMembership(admin, auth.user.id);
     if (!membership || membership.role !== 'admin') return response.status(403).json({ error: 'Somente administradores podem criar convites.' });
 
-    const { data: ownerProfile, error: profileLookupError } = await admin.from('profiles').select('plan').eq('id', auth.user.id).maybeSingle();
-    if (profileLookupError) throw profileLookupError;
-    const plan = ownerProfile?.plan || 'individual';
+    const { data: workspacePlan, error: planLookupError } = await admin.from('workspaces').select('plan').eq('id', membership.workspace_id).single();
+    if (planLookupError) throw planLookupError;
+    const plan = workspacePlan?.plan || 'individual';
     const planLimit = PLAN_LIMITS[plan] || 1;
     const { count: membersCount, error: countError } = await admin.from('workspace_members').select('*', { count: 'exact', head: true }).eq('workspace_id', membership.workspace_id);
     if (countError) throw countError;
