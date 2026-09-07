@@ -338,7 +338,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // sessão persistida. Um login feito agora continua seguindo ao painel.
       if (!event || event === 'INITIAL_SESSION') {
         authDestinationRef.current = null;
-        setCurrentView('auth');
+        const resumeView = sessionStorage.getItem('studiodesk_resume_view');
+        if (resumeView === 'dashboard') {
+          sessionStorage.removeItem('studiodesk_resume_view');
+          setCurrentView('dashboard');
+        } else {
+          setCurrentView('auth');
+        }
       } else if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
         const destination = authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard');
         authDestinationRef.current = null;
