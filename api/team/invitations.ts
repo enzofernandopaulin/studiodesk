@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
 
-type Role = 'gestor' | 'colaborador';
+type Role = 'admin' | 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
 
 export default async function handler(request: any, response: any) {
@@ -55,10 +55,7 @@ export default async function handler(request: any, response: any) {
 
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
     const teamName = typeof body.teamName === 'string' ? body.teamName.trim().slice(0, 120) : '';
-    if (body.role === 'admin') {
-      return response.status(400).json({ error: 'Links reutilizáveis não podem conceder acesso de administrador.' });
-    }
-    const role: Role = body.role === 'gestor' ? 'gestor' : 'colaborador';
+    const role: Role = ['admin','gestor','colaborador'].includes(body.role) ? body.role : 'colaborador';
     const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
     if (!appUrl.startsWith('https://')) return response.status(503).json({ error: 'APP_URL não está configurada corretamente.' });
     if (teamName) {
@@ -78,7 +75,7 @@ export default async function handler(request: any, response: any) {
       max_uses: remainingSeats,
     });
     if (insertError) {
-      if (/workspace_invitations/i.test(insertError.message)) return response.status(503).json({ error: 'Execute a migration de segurança mais recente no Supabase antes de criar convites.' });
+      if (/workspace_invitations/i.test(insertError.message)) return response.status(503).json({ error: 'Execute supabase/CORRECAO-WORKSPACES-E-CONVITES.sql no Supabase antes de criar convites.' });
       throw insertError;
     }
 
@@ -88,7 +85,7 @@ export default async function handler(request: any, response: any) {
     console.error(`${request.method} /api/team/invitations failed`, error);
     const message = error instanceof Error ? error.message : '';
     if (/column .*plan|column .*invited_name|column .*job_title|schema cache/i.test(message)) {
-      return response.status(503).json({ error: 'O banco ainda não recebeu a migration de segurança mais recente.' });
+      return response.status(503).json({ error: 'O banco ainda não recebeu a atualização de equipes. Execute supabase/CORRECAO-WORKSPACES-E-CONVITES.sql no Supabase.' });
     }
     if (/Configure uma URL Supabase válida|SUPABASE_SERVICE_ROLE_KEY/i.test(message)) {
       return response.status(503).json({ error: 'As variáveis privadas do Supabase não estão configuradas corretamente na Vercel.' });
