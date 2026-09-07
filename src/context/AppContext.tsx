@@ -1131,6 +1131,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       body: JSON.stringify({
         name: memberData.name,
         email: memberData.email,
+        jobTitle: memberData.role,
         role: memberData.accessLevel,
       }),
     });
