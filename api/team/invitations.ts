@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
+import { sendInviteEmail } from '../_lib/email.js';
 
 type Role = 'admin' | 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
@@ -44,7 +45,7 @@ export default async function handler(request: any, response: any) {
     const membership = await getMembership(admin, auth.user.id);
     if (!membership || membership.role !== 'admin') return response.status(403).json({ error: 'Somente administradores podem criar convites.' });
 
-    const { data: workspacePlan, error: planLookupError } = await admin.from('workspaces').select('plan').eq('id', membership.workspace_id).single();
+    const { data: workspacePlan, error: planLookupError } = await admin.from('workspaces').select('name,plan').eq('id', membership.workspace_id).single();
     if (planLookupError) throw planLookupError;
     const plan = workspacePlan?.plan || 'individual';
     const planLimit = PLAN_LIMITS[plan] || 1;
@@ -55,6 +56,9 @@ export default async function handler(request: any, response: any) {
 
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
     const email = typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 254) : '';
+    const recipientName = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    const jobTitle = typeof body.jobTitle === 'string' ? body.jobTitle.trim().slice(0, 120) : '';
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return response.status(400).json({ error: 'Informe um endereço de e-mail válido.' });
     const teamName = typeof body.teamName === 'string' ? body.teamName.trim().slice(0, 120) : '';
     const role: Role = ['admin','gestor','colaborador'].includes(body.role) ? body.role : 'colaborador';
     const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
@@ -71,6 +75,8 @@ export default async function handler(request: any, response: any) {
       workspace_id: membership.workspace_id,
       token_hash: tokenHash,
       email: email || null,
+      invited_name: recipientName || null,
+      job_title: jobTitle || null,
       role,
       created_by: auth.user.id,
       max_uses: email ? 1 : remainingSeats,
@@ -84,19 +90,38 @@ export default async function handler(request: any, response: any) {
     let emailSent = false;
     let emailWarning = '';
     if (email) {
-      const { error } = await admin.auth.admin.inviteUserByEmail(email, {
-        redirectTo: inviteUrl,
-        data: { invited_workspace_id: membership.workspace_id },
-      });
-      emailSent = !error;
-      if (error) emailWarning = /already|registered|exists/i.test(error.message)
-        ? 'O e-mail já possui conta. Copie e envie o link diretamente para essa pessoa.'
-        : error.message;
+      const { data: inviterProfile } = await admin.from('profiles').select('name').eq('id', auth.user.id).maybeSingle();
+      try {
+        await sendInviteEmail({
+          to: email,
+          recipientName,
+          inviterName: inviterProfile?.name || auth.user.email || 'StudioDesk',
+          workspaceName: teamName || workspacePlan.name || 'StudioDesk',
+          role,
+          inviteUrl,
+        });
+        emailSent = true;
+      } catch (sendError) {
+        console.error('Workspace invitation email failed', sendError);
+        const sendMessage = sendError instanceof Error ? sendError.message : '';
+        emailWarning = sendMessage.includes('RESEND_API_KEY_NOT_CONFIGURED')
+          ? 'Configure RESEND_API_KEY na Vercel para enviar convites por e-mail.'
+          : sendMessage.includes('INVITE_FROM_EMAIL_NOT_CONFIGURED')
+            ? 'Configure INVITE_FROM_EMAIL na Vercel com um remetente autorizado.'
+            : 'O provedor de e-mail recusou o envio. Confira o domínio e os logs da Resend.';
+      }
     }
 
     return response.status(201).json({ inviteUrl, emailSent, emailWarning, expiresInDays: 7, maxUses: email ? 1 : remainingSeats, planLimit, remainingSeats });
   } catch (error) {
     console.error(`${request.method} /api/team/invitations failed`, error);
-    return response.status(500).json({ error: 'Não foi possível criar o convite.' });
+    const message = error instanceof Error ? error.message : '';
+    if (/column .*plan|column .*invited_name|column .*job_title|schema cache/i.test(message)) {
+      return response.status(503).json({ error: 'O banco ainda não recebeu a atualização de equipes. Execute supabase/MULTI-WORKSPACE.sql no Supabase.' });
+    }
+    if (/Configure uma URL Supabase válida|SUPABASE_SERVICE_ROLE_KEY/i.test(message)) {
+      return response.status(503).json({ error: 'As variáveis privadas do Supabase não estão configuradas corretamente na Vercel.' });
+    }
+    return response.status(500).json({ error: request.method === 'GET' ? 'Não foi possível abrir este convite.' : 'Não foi possível criar o convite.' });
   }
 }
