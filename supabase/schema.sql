@@ -29,6 +29,8 @@ create table if not exists public.workspace_invitations (
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   token_hash text not null unique,
   email text,
+  invited_name text,
+  job_title text,
   role text not null default 'colaborador' check (role in ('admin','gestor','colaborador')),
   created_by uuid not null references auth.users(id) on delete cascade,
   expires_at timestamptz not null default (now() + interval '7 days'),
