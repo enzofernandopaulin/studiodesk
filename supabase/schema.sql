@@ -22,6 +22,24 @@ create table if not exists public.workspace_members (
   primary key (workspace_id, user_id)
 );
 
+create table if not exists public.workspace_invitations (
+  id uuid primary key default gen_random_uuid(),
+  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  token_hash text not null unique,
+  email text,
+  role text not null default 'colaborador' check (role in ('admin','gestor','colaborador')),
+  created_by uuid not null references auth.users(id) on delete cascade,
+  expires_at timestamptz not null default (now() + interval '7 days'),
+  accepted_by uuid references auth.users(id) on delete set null,
+  accepted_at timestamptz,
+  max_uses integer not null default 25 check (max_uses between 1 and 50),
+  uses_count integer not null default 0 check (uses_count >= 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists workspace_invitations_workspace_idx
+  on public.workspace_invitations(workspace_id, created_at desc);
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   workspace_id uuid references public.workspaces(id) on delete cascade,
