@@ -119,6 +119,20 @@ export async function loadProfile(userId: string): Promise<Partial<UserProfile> 
 
 export async function saveProfile(user: UserProfile): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.from('profiles').upsert({ id:user.id,name:user.name,email:user.email,avatar:user.avatar,role:user.role,plan:user.plan,business_type:user.businessType,team_size:user.teamSize,objectives:user.objectives,template:user.template,company_name:user.companyName,updated_at:new Date().toISOString() }, { onConflict:'id' });
+  if (!user.id) throw new Error('Perfil autenticado não encontrado.');
+  // O bootstrap cria o perfil. O navegador pode apenas atualizar o próprio
+  // registro; usar upsert exigiria permissão de INSERT e seria bloqueado pelo RLS.
+  const { data, error } = await supabase.from('profiles').update({
+    name:user.name,
+    avatar:user.avatar,
+    plan:user.plan,
+    business_type:user.businessType,
+    team_size:user.teamSize,
+    objectives:user.objectives,
+    template:user.template,
+    company_name:user.companyName,
+    updated_at:new Date().toISOString()
+  }).eq('id', user.id).select('id').maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error('O perfil não foi encontrado no Supabase. Atualize a página e tente novamente.');
 }
