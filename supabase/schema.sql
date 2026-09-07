@@ -10,6 +10,8 @@ create extension if not exists pgcrypto;
 create table if not exists public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null default 'Minha Agência',
+  owner_id uuid references auth.users(id) on delete set null,
+  plan text not null default 'individual' check (plan in ('individual','solo','studio','empresa','agencia')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -614,15 +616,19 @@ set search_path = public
 as $$
 declare
   membership_role text;
-  membership_workspace uuid;
 begin
-  select wm.workspace_id, wm.role into membership_workspace, membership_role
+  select wm.role into membership_role
   from public.workspace_members wm
   where wm.user_id = old.id
+    and wm.workspace_id = new.workspace_id
   limit 1;
 
-  new.workspace_id := coalesce(membership_workspace, old.workspace_id);
-  new.role := coalesce(membership_role, old.role);
+  if membership_role is null then
+    new.workspace_id := old.workspace_id;
+    new.role := old.role;
+  else
+    new.role := membership_role;
+  end if;
   new.id := old.id;
   return new;
 end;
