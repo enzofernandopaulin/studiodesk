@@ -55,8 +55,7 @@ export const App: React.FC = () => {
       return;
     }
     if (!isAuthenticated) return;
-    // Uma sessão restaurada pode permanecer na tela de login. O redirecionamento
-    // ao painel acontece somente após o usuário enviar o login novamente.
+    // A sessão restaurada pelo Supabase permanece autenticada após recarregar.
     const permission = viewPermission[currentView];
     if (permission && !can(permission)) setCurrentView('dashboard');
   }, [authReady, isAuthenticated, currentView, can, setCurrentView, isPublicView, user.businessType, user.teamSize]);
@@ -114,26 +113,26 @@ export const App: React.FC = () => {
 
             <main className="h-full min-w-0 overflow-y-auto bg-[#F5F7F9] pb-16 lg:ml-64">
               {restrictedView ? <AccessDenied /> : null}
-              {!restrictedView && (
-                <>
-                  {currentView === 'dashboard' && <DashboardView onOpenQuickCreate={handleOpenQuickCreate} />}
-                  {currentView === 'leads' && <LeadsView />}
-                  {currentView === 'clients' && <ClientsView />}
-                  {currentView === 'client_profile' && <ClientProfileView onOpenNewProjectForClient={handleOpenNewProjectForClient} />}
-                  {currentView === 'kanban' && <KanbanBoardView />}
-                  {currentView === 'projects' && <ProjectsListView />}
-                  {currentView === 'project_detail' && <ProjectDetailView />}
-                  {currentView === 'tasks' && <TasksView />}
-                  {(currentView === 'calendar' || currentView === 'schedule') && <CalendarView />}
-                  {(currentView === 'approvals' || currentView === 'approval') && <ApprovalsView />}
-                  {(currentView === 'operational_metrics' || currentView === 'metrics') && <OperationalMetricsView />}
-                  {currentView === 'activities' && <ActivitiesView />}
-                  {currentView === 'communication' && <CommunicationHubView />}
-                  {currentView === 'integrations' && <IntegrationsView />}
-                  {currentView === 'team' && <TeamView />}
-                  {currentView === 'settings' && <SettingsView />}
-                </>
+              {!restrictedView && currentView === 'dashboard' && (
+                <DashboardView onOpenQuickCreate={handleOpenQuickCreate} />
               )}
+              {currentView === 'leads' && <LeadsView />}
+              {currentView === 'clients' && <ClientsView />}
+              {currentView === 'client_profile' && (
+                <ClientProfileView onOpenNewProjectForClient={handleOpenNewProjectForClient} />
+              )}
+              {currentView === 'kanban' && <KanbanBoardView />}
+              {currentView === 'projects' && <ProjectsListView />}
+              {currentView === 'project_detail' && <ProjectDetailView />}
+              {currentView === 'tasks' && <TasksView />}
+              {(currentView === 'calendar' || currentView === 'schedule') && <CalendarView />}
+              {(currentView === 'approvals' || currentView === 'approval') && <ApprovalsView />}
+              {(currentView === 'operational_metrics' || currentView === 'metrics') && <OperationalMetricsView />}
+              {currentView === 'activities' && <ActivitiesView />}
+              {currentView === 'communication' && <CommunicationHubView />}
+              {currentView === 'integrations' && <IntegrationsView />}
+              {currentView === 'team' && <TeamView />}
+              {currentView === 'settings' && <SettingsView />}
             </main>
           </div>
         </div>

@@ -351,8 +351,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!mounted || sequence !== authSequence) return;
       setAuthReady(true);
 
-      // Ao abrir/recarregar o site, mostramos o login mesmo que exista uma
-      // sessão persistida. Um login feito agora continua seguindo ao painel.
+      // O Supabase persiste a sessão no navegador. Ao recarregar, retomamos a
+      // área autenticada sem pedir login novamente.
       if (!event || event === 'INITIAL_SESSION') {
         authDestinationRef.current = null;
         const resumeView = sessionStorage.getItem('studiodesk_resume_view');
@@ -360,7 +360,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           sessionStorage.removeItem('studiodesk_resume_view');
           setCurrentView('dashboard');
         } else {
-          setCurrentView('auth');
+          setCurrentView(needsOnboarding ? 'profile_select' : 'dashboard');
         }
       } else if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
         const destination = authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard');
