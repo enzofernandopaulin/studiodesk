@@ -16,7 +16,7 @@ export default async function handler(request: any, response: any) {
     if (!/^[a-f0-9]{64}$/i.test(rawToken)) return response.status(400).json({ error: 'Link de convite inválido.' });
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
     const { data: invitation, error } = await admin.from('workspace_invitations')
-      .select('id,workspace_id,email,role,expires_at,accepted_at,max_uses,uses_count')
+      .select('id,workspace_id,email,invited_name,job_title,role,expires_at,accepted_at,max_uses,uses_count')
       .eq('token_hash', tokenHash).maybeSingle();
     if (error || !invitation) return response.status(404).json({ error: 'Convite não encontrado.' });
     if (invitation.uses_count >= invitation.max_uses) return response.status(409).json({ error: 'Este convite atingiu o limite de entradas.' });
@@ -57,14 +57,21 @@ export default async function handler(request: any, response: any) {
     await admin.from('workspace_invitations').update({ accepted_by: auth.user.id, accepted_at: new Date().toISOString(), uses_count: invitation.uses_count + 1 }).eq('id', invitation.id).eq('uses_count', invitation.uses_count);
     await admin.from('team_members').upsert({
       id: `tm_${auth.user.id}`, workspace_id: invitation.workspace_id,
-      name: profile?.name || auth.user.user_metadata?.name || auth.user.email || 'Membro',
-      email: auth.user.email || '', role: 'Membro da equipe', access_level: invitation.role,
+      name: profile?.name || invitation.invited_name || auth.user.user_metadata?.name || auth.user.email || 'Membro',
+      email: auth.user.email || '', role: invitation.job_title || 'Membro da equipe', access_level: invitation.role,
       avatar: '', projects_count: 0, status: 'ativo',
     }, { onConflict: 'workspace_id,id' });
 
     return response.status(200).json({ joined: true, workspaceId: invitation.workspace_id, workspaceName: targetWorkspace.name });
   } catch (error) {
     console.error('POST /api/team/join failed', error);
+    const message = error instanceof Error ? error.message : '';
+    if (/column .*plan|column .*invited_name|column .*job_title|schema cache/i.test(message)) {
+      return response.status(503).json({ error: 'O banco ainda não recebeu a atualização de equipes. Execute supabase/MULTI-WORKSPACE.sql no Supabase.' });
+    }
+    if (/Configure uma URL Supabase válida|SUPABASE_SERVICE_ROLE_KEY/i.test(message)) {
+      return response.status(503).json({ error: 'As variáveis privadas do Supabase não estão configuradas corretamente na Vercel.' });
+    }
     return response.status(500).json({ error: 'Não foi possível entrar na equipe.' });
   }
 }
