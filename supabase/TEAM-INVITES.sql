@@ -4,6 +4,8 @@ create table if not exists public.workspace_invitations (
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
   token_hash text not null unique,
   email text,
+  invited_name text,
+  job_title text,
   role text not null default 'colaborador' check (role in ('admin','gestor','colaborador')),
   created_by uuid not null references auth.users(id) on delete cascade,
   expires_at timestamptz not null default (now() + interval '7 days'),
@@ -16,6 +18,8 @@ create table if not exists public.workspace_invitations (
 
 alter table public.workspace_invitations add column if not exists max_uses integer not null default 25;
 alter table public.workspace_invitations add column if not exists uses_count integer not null default 0;
+alter table public.workspace_invitations add column if not exists invited_name text;
+alter table public.workspace_invitations add column if not exists job_title text;
 
 create index if not exists workspace_invitations_workspace_idx
   on public.workspace_invitations(workspace_id, created_at desc);
