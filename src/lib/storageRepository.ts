@@ -2,9 +2,12 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import { getWorkspaceId } from './workspaceRepository';
 
 export const STORAGE_BUCKET = 'studiodesk-files';
+export const PROFILE_AVATAR_BUCKET = 'studiodesk-avatars';
 export const STORAGE_REFERENCE_PREFIX = 'storage://';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const allowedAvatarMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const allowedMimeTypes = new Set([
   'video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo',
@@ -78,4 +81,44 @@ export async function removeWorkspaceFile(reference?: string | null): Promise<vo
   if (!parsed) return;
   const { error } = await supabase.storage.from(parsed.bucket).remove([parsed.path]);
   if (error) throw error;
+}
+
+const avatarObjectPath = (userId: string) => `${userId}/profile`;
+
+/**
+ * Guarda a foto como objeto no Supabase Storage. O caminho é determinístico,
+ * portanto nenhuma imagem, Base64, URL ou referência precisa ser persistida
+ * na tabela profiles.
+ */
+export async function uploadProfileAvatar(userId: string, file: File): Promise<string> {
+  if (!supabase || !isSupabaseConfigured) throw new Error('Supabase não está configurado.');
+  if (!userId) throw new Error('Usuário não autenticado.');
+  if (!allowedAvatarMimeTypes.has(file.type)) throw new Error('Use uma imagem JPG, PNG ou WEBP.');
+  if (file.size > MAX_AVATAR_SIZE) throw new Error('A foto deve ter no máximo 5 MB.');
+
+  const path = avatarObjectPath(userId);
+  const { error } = await supabase.storage.from(PROFILE_AVATAR_BUCKET).upload(path, file, {
+    cacheControl: '3600',
+    contentType: file.type,
+    upsert: true,
+  });
+  if (error) throw error;
+
+  const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(path);
+  return `${data.publicUrl}?v=${Date.now()}`;
+}
+
+export async function loadProfileAvatarUrl(userId: string): Promise<string | null> {
+  if (!supabase || !userId) return null;
+  const { data: objects, error } = await supabase.storage
+    .from(PROFILE_AVATAR_BUCKET)
+    .list(userId, { limit: 1, search: 'profile' });
+  if (error) {
+    // O bucket pode ainda não existir enquanto o SQL de configuração não foi executado.
+    if (/bucket|not found/i.test(error.message)) return null;
+    throw error;
+  }
+  if (!objects?.some(object => object.name === 'profile')) return null;
+  const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(avatarObjectPath(userId));
+  return data.publicUrl;
 }

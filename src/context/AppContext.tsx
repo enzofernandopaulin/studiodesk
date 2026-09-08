@@ -27,7 +27,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { loadProfile, loadWorkspace, loadWorkspacePatch } from '../lib/workspaceRepository';
 import type { WorkspaceState } from '../lib/workspaceRepository';
 import { convertLeadAtomic, entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
-import { uploadWorkspaceFile } from '../lib/storageRepository';
+import { loadProfileAvatarUrl, uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
 import { subscribeToWorkspaceRealtime, removeRealtimeChannel, RealtimeTable } from '../lib/realtimeRepository';
 import { callServerApi } from '../lib/serverApi';
@@ -274,11 +274,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
       const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string }>('/api/session/bootstrap', { method: 'POST' });
-      const [profile, workspace, canonicalTeam] = await Promise.all([
+      const [profile, workspace, canonicalTeam, avatarUrl] = await Promise.all([
         loadProfile(userId),
         loadWorkspace(bootstrap.workspaceId),
         fetchCanonicalTeam().catch(error => {
           console.error('StudioDesk: falha ao carregar diretório canônico da equipe', error);
+          return null;
+        }),
+        loadProfileAvatarUrl(userId).catch(error => {
+          console.error('StudioDesk: foto do perfil não carregada', error);
           return null;
         }),
       ]);
@@ -291,6 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         id: userId,
         ...profile,
+        avatar: avatarUrl ?? '',
       }));
 
       if (!workspace) throw new Error('A conta não possui um workspace ativo válido.');

@@ -201,7 +201,8 @@ export async function completeOnboarding(user: UserProfile, columns: KanbanColum
   if (!user.id) throw new Error('Usuário autenticado não encontrado.');
   const { error } = await supabase.rpc('complete_studiodesk_onboarding', {
     p_name: user.name,
-    p_avatar: user.avatar,
+    // A foto é armazenada no bucket studiodesk-avatars, nunca em profiles.
+    p_avatar: '',
     p_plan: user.plan,
     p_business_type: user.businessType,
     p_team_size: user.teamSize,
@@ -219,10 +220,10 @@ export async function completeOnboarding(user: UserProfile, columns: KanbanColum
 
 export async function loadProfile(userId: string): Promise<Partial<UserProfile> | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('profiles').select('name,email,avatar,role,plan,business_type,team_size,objectives,template,company_name').eq('id', userId).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('name,email,role,plan,business_type,team_size,objectives,template,company_name').eq('id', userId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { id:userId,name:data.name,email:data.email,avatar:data.avatar,role:data.role,plan:data.plan,businessType:data.business_type,teamSize:data.team_size,objectives:data.objectives ?? [],template:data.template,companyName:data.company_name };
+  return { id:userId,name:data.name,email:data.email,role:data.role,plan:data.plan,businessType:data.business_type,teamSize:data.team_size,objectives:data.objectives ?? [],template:data.template,companyName:data.company_name };
 }
 
 export async function saveProfile(user: UserProfile): Promise<void> {
@@ -232,7 +233,6 @@ export async function saveProfile(user: UserProfile): Promise<void> {
   // registro; usar upsert exigiria permissão de INSERT e seria bloqueado pelo RLS.
   const { data, error } = await supabase.from('profiles').update({
     name:user.name,
-    avatar:user.avatar,
     plan:user.plan,
     business_type:user.businessType,
     team_size:user.teamSize,

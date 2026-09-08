@@ -13,10 +13,12 @@ import {
   Layers,
   Users,
   CreditCard,
-  ArrowUpRight
+  ArrowUpRight,
+  Camera
 } from 'lucide-react';
 import { PLANS_LIST, getPlanDetails, PlanType } from '../../data/plans';
 import { saveProfile } from '../../lib/workspaceRepository';
+import { uploadProfileAvatar } from '../../lib/storageRepository';
 
 export const SettingsView: React.FC = () => {
   const { 
@@ -32,6 +34,7 @@ export const SettingsView: React.FC = () => {
   const [companyName, setCompanyName] = useState(user.companyName);
   const [template, setTemplate] = useState(user.template || 'Audiovisual');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const currentPlanDetails = getPlanDetails(user.plan);
 
@@ -52,6 +55,20 @@ export const SettingsView: React.FC = () => {
       addToast('error', 'Configurações não salvas', error instanceof Error ? error.message : 'Tente novamente.');
     } finally {
       setIsSavingProfile(false);
+    }
+  };
+
+  const handleAvatarUpload = async (file?: File) => {
+    if (!file || isUploadingAvatar) return;
+    setIsUploadingAvatar(true);
+    try {
+      const avatar = await uploadProfileAvatar(user.id, file);
+      setUser(previous => ({ ...previous, avatar }));
+      addToast('success', 'Foto atualizada', 'A imagem foi salva com segurança no Supabase Storage.');
+    } catch (error) {
+      addToast('error', 'Foto não atualizada', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -81,6 +98,41 @@ export const SettingsView: React.FC = () => {
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-xl border border-[#DDE3E8] bg-[#F8FAFC] p-4">
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt={`Foto de ${user.name}`}
+                    className="h-20 w-20 rounded-2xl border border-[#DDE3E8] object-cover bg-white"
+                  />
+                ) : (
+                  <div className="h-20 w-20 rounded-2xl border border-[#DDE3E8] bg-white flex items-center justify-center text-xl font-black text-[#2F6F9C]">
+                    {(userName || user.email || 'U').trim().charAt(0).toUpperCase()}
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs font-bold text-[#111111]">Foto do perfil</p>
+                    <p className="text-[11px] text-[#6B7280]">JPG, PNG ou WEBP, com até 5 MB. A imagem fica somente no Storage.</p>
+                  </div>
+                  <label className={`inline-flex items-center gap-2 rounded-xl bg-[#111111] px-4 py-2 text-xs font-bold text-white transition-colors ${isUploadingAvatar ? 'cursor-wait opacity-60' : 'cursor-pointer hover:bg-[#2F6F9C]'}`}>
+                    <Camera className="h-4 w-4 text-[#66acd7]" />
+                    {isUploadingAvatar ? 'Enviando...' : user.avatar ? 'Trocar foto' : 'Adicionar foto'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      disabled={isUploadingAvatar}
+                      onChange={event => {
+                        void handleAvatarUpload(event.target.files?.[0]);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-[#111111] mb-1">Seu Nome</label>

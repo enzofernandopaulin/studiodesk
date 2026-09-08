@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { completeOnboarding } from '../../lib/workspaceRepository';
+import { uploadProfileAvatar } from '../../lib/storageRepository';
 import { Logo } from '../common/Logo';
 import { 
   ArrowRight, 
@@ -31,7 +32,8 @@ export const OnboardingWizard: React.FC = () => {
   // Form states initialized with current user profile
   const [name, setName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
-  const [avatar, setAvatar] = useState(user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80');
+  const [avatar, setAvatar] = useState(user.avatar || '');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [businessType, setBusinessType] = useState(user.businessType || 'Agência');
   const [teamSize, setTeamSize] = useState(user.teamSize || (user.plan === 'individual' ? '1' : '6–10'));
   const [objectives, setObjectives] = useState<string[]>(user.objectives || [
@@ -120,6 +122,20 @@ export const OnboardingWizard: React.FC = () => {
     setObjectives(prev => 
       prev.includes(objLabel) ? prev.filter(o => o !== objLabel) : [...prev, objLabel]
     );
+  };
+
+  const handleAvatarUpload = async (file?: File) => {
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    try {
+      const url = await uploadProfileAvatar(user.id, file);
+      setAvatar(url);
+      addToast('success', 'Foto enviada', 'A foto foi salva no Supabase Storage.');
+    } catch (error) {
+      addToast('error', 'Foto não enviada', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const handleFinish = async () => {
@@ -260,24 +276,30 @@ export const OnboardingWizard: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#111111] mb-1">Foto / Avatar (URL)</label>
+                  <label className="block text-xs font-bold text-[#111111] mb-1">Foto do perfil</label>
                   <div className="flex items-center gap-3">
-                    <img
-                      src={avatar}
-                      alt="Preview"
-                      className="w-12 h-12 rounded-xl object-cover border border-[#DDE3E8]"
-                    />
-                    <div className="relative flex-1">
-                      <ImageIcon className="w-4 h-4 text-[#6B7280] absolute left-3 top-3" />
+                    {avatar ? (
+                      <img src={avatar} alt="Prévia da foto" className="w-14 h-14 rounded-xl object-cover border border-[#DDE3E8]" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] flex items-center justify-center">
+                        <ImageIcon className="w-5 h-5 text-[#6B7280]" />
+                      </div>
+                    )}
+                    <label className="flex-1 cursor-pointer rounded-xl border border-[#DDE3E8] bg-[#F5F7F9] px-4 py-3 text-center text-xs font-bold text-[#111111] hover:border-[#66acd7]">
+                      {isUploadingAvatar ? 'Enviando foto...' : avatar ? 'Trocar imagem' : 'Escolher imagem'}
                       <input
-                        type="text"
-                        value={avatar}
-                        onChange={e => setAvatar(e.target.value)}
-                        placeholder="https://..."
-                        className="w-full pl-9 pr-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#66acd7]"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        disabled={isUploadingAvatar}
+                        className="hidden"
+                        onChange={event => {
+                          void handleAvatarUpload(event.target.files?.[0]);
+                          event.target.value = '';
+                        }}
                       />
-                    </div>
+                    </label>
                   </div>
+                  <p className="mt-1 text-[10px] text-[#6B7280]">JPG, PNG ou WEBP, com até 5 MB. A imagem fica no Storage, não no banco.</p>
                 </div>
               </div>
             </div>

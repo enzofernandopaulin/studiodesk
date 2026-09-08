@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   Search, 
@@ -45,6 +45,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCre
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user.avatar]);
 
   const notifications = timelineEvents.slice(0, 5);
 
@@ -216,11 +221,21 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCre
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             className="flex items-center gap-2 p-1 rounded-xl hover:bg-[#F5F7F9] transition-colors"
           >
-            <img
-              src={user.avatar}
-              alt={user.name}
-              className="w-8 h-8 rounded-lg object-cover border border-[#DDE3E8]"
-            />
+            {user.avatar && !avatarFailed ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="w-8 h-8 rounded-lg object-cover border border-[#DDE3E8]"
+                onError={() => setAvatarFailed(true)}
+              />
+            ) : (
+              <span
+                className="w-8 h-8 rounded-lg border border-[#DDE3E8] bg-[#EAF4FA] text-[#2F6F9C] flex items-center justify-center text-xs font-black"
+                aria-label={`Foto de ${user.name}`}
+              >
+                {(user.name || user.email || 'U').trim().charAt(0).toUpperCase()}
+              </span>
+            )}
             <div className="hidden md:block text-left">
               <span className="text-xs font-bold text-[#111111] block leading-tight">{user.name}</span>
               <span className="text-[10px] text-[#6B7280] block">{user.companyName}</span>
