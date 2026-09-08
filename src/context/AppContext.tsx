@@ -124,6 +124,12 @@ interface AppContextType {
   authReady: boolean;
   workspaceStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
   workspaceError: string;
+  isCurrentViewDataLoading: boolean;
+  currentViewDataError: string;
+  retryCurrentViewData: () => void;
+  hasMoreCurrentViewData: boolean;
+  isLoadingMoreCurrentViewData: boolean;
+  loadMoreCurrentViewData: () => Promise<void>;
   retryWorkspaceLoad: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (name: string, email: string, password: string, companyName: string) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
@@ -148,6 +154,34 @@ const EMPTY_USER: UserProfile = {
   companyName: '',
 };
 
+type DataModule = 'calendar' | 'approvals' | 'metrics' | 'communication' | 'activities' | 'integrations';
+
+const getDataModule = (view: ActiveView): DataModule | null => {
+  if (view === 'calendar' || view === 'schedule') return 'calendar';
+  if (view === 'approvals' || view === 'approval') return 'approvals';
+  if (view === 'operational_metrics' || view === 'metrics') return 'metrics';
+  if (view === 'communication') return 'communication';
+  if (view === 'activities') return 'activities';
+  if (view === 'integrations') return 'integrations';
+  return null;
+};
+
+const DATA_MODULE_TABLES: Record<DataModule, RealtimeTable[]> = {
+  calendar: ['calendar_events'],
+  approvals: ['approval_requests'],
+  metrics: ['calendar_events', 'approval_requests'],
+  communication: ['messages', 'communications'],
+  activities: ['timeline_events'],
+  integrations: ['integrations'],
+};
+
+const MODULE_PAGE_SIZE = 100;
+const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] => {
+  const items = new Map(current.map(item => [item.id, item]));
+  incoming.forEach(item => items.set(item.id, item));
+  return [...items.values()];
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<ActiveView>('landing');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -167,6 +201,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isHydrated, setIsHydrated] = useState(!isSupabaseConfigured);
   const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
   const [workspaceError, setWorkspaceError] = useState('');
+  const [loadedDataModules, setLoadedDataModules] = useState<Set<DataModule>>(new Set());
+  const [dataModuleErrors, setDataModuleErrors] = useState<Partial<Record<DataModule, string>>>({});
+  const [dataModuleRetry, setDataModuleRetry] = useState(0);
+  const [dataModulePages, setDataModulePages] = useState<Partial<Record<DataModule, number>>>({});
+  const [dataModuleHasMore, setDataModuleHasMore] = useState<Partial<Record<DataModule, boolean>>>({});
+  const [isLoadingMoreCurrentViewData, setIsLoadingMoreCurrentViewData] = useState(false);
+  const loadingDataModulesRef = useRef<Set<DataModule>>(new Set());
 
   const [user, setUserState] = useState<UserProfile>(EMPTY_USER);
   const setUser: React.Dispatch<React.SetStateAction<UserProfile>> = (update) => {
@@ -246,6 +287,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setAuthUserId(userId);
       setActiveWorkspaceId(bootstrap.workspaceId);
+      setLoadedDataModules(new Set());
+      setDataModuleErrors({});
+      setDataModulePages({});
+      setDataModuleHasMore({});
+      loadingDataModulesRef.current.clear();
       loadedUserRef.current = userId;
       setIsHydrated(true);
       const hasBusinessData = workspace.leads.length > 0 || workspace.clients.length > 0 || workspace.projects.length > 0 || workspace.tasks.length > 0;
@@ -293,6 +339,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsHydrated(true);
         setWorkspaceStatus('idle');
         setWorkspaceError('');
+        setLoadedDataModules(new Set());
+        setDataModuleErrors({});
+        setDataModulePages({});
+        setDataModuleHasMore({});
+        loadingDataModulesRef.current.clear();
         setAuthReady(true);
         if (event === 'SIGNED_OUT') setCurrentView('landing');
         return;
@@ -357,6 +408,94 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const detail = error instanceof Error ? error.message : message;
       addToast('error', 'Alteração não salva', detail || message);
       throw error;
+    }
+  };
+
+  // Agenda, aprovações, comunicação e integrações são buscadas apenas quando
+  // abertas. Uma falha isolada não encerra a sessão nem invalida o workspace.
+  useEffect(() => {
+    const module = getDataModule(currentView);
+    if (!module || !activeWorkspaceId || !isHydrated || loadedDataModules.has(module) ||
+        dataModuleErrors[module] || loadingDataModulesRef.current.has(module)) return;
+
+    let cancelled = false;
+    loadingDataModulesRef.current.add(module);
+    void loadWorkspacePatch(activeWorkspaceId, DATA_MODULE_TABLES[module], { from: 0, to: MODULE_PAGE_SIZE - 1 })
+      .then(patch => {
+        if (cancelled) return;
+        if (patch.calendarEvents) setCalendarEvents(patch.calendarEvents);
+        if (patch.approvalRequests) setApprovalRequests(patch.approvalRequests);
+        if (patch.messages) setMessages(patch.messages);
+        if (patch.communications) setCommunications(patch.communications);
+        if (patch.timelineEvents) setTimelineEvents(patch.timelineEvents);
+        if (patch.integrations) setIntegrations(patch.integrations);
+        const pageSizes = [patch.calendarEvents?.length, patch.approvalRequests?.length,
+          patch.messages?.length, patch.communications?.length, patch.timelineEvents?.length, patch.integrations?.length]
+          .filter((size): size is number => typeof size === 'number');
+        setDataModulePages(previous => ({ ...previous, [module]: 0 }));
+        setDataModuleHasMore(previous => ({ ...previous, [module]: Math.max(0, ...pageSizes) === MODULE_PAGE_SIZE }));
+        setLoadedDataModules(previous => {
+          const next = new Set(previous);
+          next.add(module);
+          return next;
+        });
+      })
+      .catch(error => {
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : 'Não foi possível carregar este módulo.';
+        console.error(`StudioDesk: falha ao carregar módulo ${module}`, error);
+        setDataModuleErrors(previous => ({ ...previous, [module]: message }));
+      })
+      .finally(() => {
+        loadingDataModulesRef.current.delete(module);
+        // Se o usuário saiu e voltou ao módulo durante a consulta, dispara a
+        // avaliação novamente em vez de deixar a tela presa em carregamento.
+        if (cancelled) setDataModuleRetry(value => value + 1);
+      });
+
+    return () => { cancelled = true; };
+  }, [currentView, activeWorkspaceId, isHydrated, loadedDataModules, dataModuleErrors, dataModuleRetry]);
+
+  const currentDataModule = getDataModule(currentView);
+  const currentViewDataError = currentDataModule ? dataModuleErrors[currentDataModule] ?? '' : '';
+  const isCurrentViewDataLoading = Boolean(
+    currentDataModule && !loadedDataModules.has(currentDataModule) && !currentViewDataError,
+  );
+  const retryCurrentViewData = () => {
+    if (!currentDataModule) return;
+    loadingDataModulesRef.current.delete(currentDataModule);
+    setDataModuleErrors(previous => {
+      const next = { ...previous };
+      delete next[currentDataModule];
+      return next;
+    });
+    setDataModuleRetry(value => value + 1);
+  };
+  const hasMoreCurrentViewData = Boolean(currentDataModule && dataModuleHasMore[currentDataModule]);
+  const loadMoreCurrentViewData = async () => {
+    if (!currentDataModule || !activeWorkspaceId || isLoadingMoreCurrentViewData || !hasMoreCurrentViewData) return;
+    const nextPage = (dataModulePages[currentDataModule] ?? 0) + 1;
+    setIsLoadingMoreCurrentViewData(true);
+    try {
+      const patch = await loadWorkspacePatch(activeWorkspaceId, DATA_MODULE_TABLES[currentDataModule], {
+        from: nextPage * MODULE_PAGE_SIZE,
+        to: (nextPage + 1) * MODULE_PAGE_SIZE - 1,
+      });
+      if (patch.calendarEvents) setCalendarEvents(current => mergeById(current, patch.calendarEvents!));
+      if (patch.approvalRequests) setApprovalRequests(current => mergeById(current, patch.approvalRequests!));
+      if (patch.messages) setMessages(current => mergeById(current, patch.messages!));
+      if (patch.communications) setCommunications(current => mergeById(current, patch.communications!));
+      if (patch.timelineEvents) setTimelineEvents(current => mergeById(current, patch.timelineEvents!));
+      if (patch.integrations) setIntegrations(current => mergeById(current, patch.integrations!));
+      const pageSizes = [patch.calendarEvents?.length, patch.approvalRequests?.length,
+        patch.messages?.length, patch.communications?.length, patch.timelineEvents?.length, patch.integrations?.length]
+        .filter((size): size is number => typeof size === 'number');
+      setDataModulePages(previous => ({ ...previous, [currentDataModule]: nextPage }));
+      setDataModuleHasMore(previous => ({ ...previous, [currentDataModule]: Math.max(0, ...pageSizes) === MODULE_PAGE_SIZE }));
+    } catch (error) {
+      addToast('error', 'Mais registros não carregados', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setIsLoadingMoreCurrentViewData(false);
     }
   };
 
@@ -1207,6 +1346,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         authReady,
         workspaceStatus,
         workspaceError,
+        isCurrentViewDataLoading,
+        currentViewDataError,
+        retryCurrentViewData,
+        hasMoreCurrentViewData,
+        isLoadingMoreCurrentViewData,
+        loadMoreCurrentViewData,
         retryWorkspaceLoad,
         signIn,
         signUp,

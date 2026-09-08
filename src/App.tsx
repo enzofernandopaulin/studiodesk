@@ -42,8 +42,21 @@ const ViewLoading = () => (
   </div>
 );
 
+const ViewDataError: React.FC<{ message: string; onRetry: () => void }> = ({ message, onRetry }) => (
+  <div className="flex min-h-[320px] items-center justify-center p-6">
+    <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center">
+      <h2 className="text-base font-black text-[#111111]">Não foi possível carregar este módulo</h2>
+      <p className="mt-2 text-xs text-[#6B7280]">O restante do workspace continua disponível.</p>
+      <p className="mt-4 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">{message}</p>
+      <button onClick={onRetry} className="mt-4 rounded-xl bg-[#111111] px-5 py-2.5 text-xs font-bold text-white">
+        Tentar novamente
+      </button>
+    </div>
+  </div>
+);
+
 export const App: React.FC = () => {
-  const { currentView, setCurrentView, user, isAuthenticated, authReady, can, workspaceStatus, workspaceError, retryWorkspaceLoad, signOut } = useApp();
+  const { currentView, setCurrentView, user, isAuthenticated, authReady, can, workspaceStatus, workspaceError, retryWorkspaceLoad, signOut, isCurrentViewDataLoading, currentViewDataError, retryCurrentViewData, hasMoreCurrentViewData, isLoadingMoreCurrentViewData, loadMoreCurrentViewData } = useApp();
 
   // Modals & Navigation
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -141,6 +154,9 @@ export const App: React.FC = () => {
             <main className="h-full min-w-0 overflow-y-auto bg-[#F5F7F9] pb-16 lg:ml-64">
               {restrictedView ? <AccessDenied /> : null}
               {!restrictedView ? <React.Suspense fallback={<ViewLoading />}>
+              {isCurrentViewDataLoading ? <ViewLoading /> : currentViewDataError ? (
+                <ViewDataError message={currentViewDataError} onRetry={retryCurrentViewData} />
+              ) : <>
               {currentView === 'dashboard' && (
                 <DashboardView onOpenQuickCreate={handleOpenQuickCreate} />
               )}
@@ -161,6 +177,18 @@ export const App: React.FC = () => {
               {currentView === 'integrations' && <IntegrationsView />}
               {currentView === 'team' && <TeamView />}
               {currentView === 'settings' && <SettingsView />}
+              {hasMoreCurrentViewData && (
+                <div className="flex justify-center px-4 pb-8">
+                  <button
+                    onClick={() => void loadMoreCurrentViewData()}
+                    disabled={isLoadingMoreCurrentViewData}
+                    className="rounded-xl border border-[#DDE3E8] bg-white px-5 py-2.5 text-xs font-bold text-[#111111] disabled:opacity-50"
+                  >
+                    {isLoadingMoreCurrentViewData ? 'Carregando...' : 'Carregar mais registros'}
+                  </button>
+                </div>
+              )}
+              </>}
               </React.Suspense> : null}
             </main>
           </div>

@@ -63,7 +63,9 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
   if (!supabase) return null;
   if (!workspaceId) return null;
 
-  const [leads, clients, columns, projects, deliverables, media, comments, tasks, calendar, approvals, messages, communications, timeline, integrations] = await Promise.all([
+  // Núcleo necessário ao dashboard e à navegação principal. Módulos menos
+  // frequentes são carregados sob demanda pelo AppContext.
+  const [leads, clients, columns, projects, deliverables, media, comments, tasks, timeline] = await Promise.all([
     supabase.from('leads').select('*').eq('workspace_id', workspaceId),
     supabase.from('clients').select('*').eq('workspace_id', workspaceId),
     supabase.from('kanban_columns').select('*').eq('workspace_id', workspaceId).order('sort_order'),
@@ -72,15 +74,10 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
     supabase.from('media_approvals').select('*').eq('workspace_id', workspaceId),
     supabase.from('approval_comments').select('*').eq('workspace_id', workspaceId),
     supabase.from('tasks').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false }),
-    supabase.from('calendar_events').select('*').eq('workspace_id', workspaceId).order('date_value'),
-    supabase.from('approval_requests').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false }),
-    supabase.from('messages').select('*').eq('workspace_id', workspaceId).order('timestamp_value'),
-    supabase.from('communications').select('*').eq('workspace_id', workspaceId).order('timestamp_value'),
-    supabase.from('timeline_events').select('*').eq('workspace_id', workspaceId).order('timestamp_value', { ascending:false }),
-    supabase.from('integrations').select('*').eq('workspace_id', workspaceId),
+    supabase.from('timeline_events').select('*').eq('workspace_id', workspaceId).order('timestamp_value', { ascending:false }).limit(20),
   ]);
 
-  const result = [leads, clients, columns, projects, deliverables, media, comments, tasks, calendar, approvals, messages, communications, timeline, integrations];
+  const result = [leads, clients, columns, projects, deliverables, media, comments, tasks, timeline];
   const failed = result.find(r => r.error);
   if (failed?.error) throw failed.error;
 
@@ -95,14 +92,14 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
     kanbanColumns: (columns.data ?? []).map(c => ({ id:c.id,title:c.title,color:c.color,order:c.sort_order })),
     projects: projectRows.map(r => ({ ...mapProject(r, deliverables.data ?? [], mediaByProject.get(r.id), commentsRows), clientName:clientNames.get(r.client_id) ?? '' })),
     tasks: (tasks.data ?? []).map(r => ({ id:r.id,title:r.title,projectId:clean(r.project_id),projectTitle:'',clientId:clean(r.client_id),clientName:clientNames.get(r.client_id) ?? undefined,assignedTo:r.assigned_to,assignedAvatar:clean(r.assigned_avatar),deadline:r.deadline,priority:r.priority,description:clean(r.description),completed:r.completed,completedAt:clean(r.completed_at),createdAt:r.created_at })),
-    calendarEvents: (calendar.data ?? []).map(r => ({ id:r.id,title:r.title,description:clean(r.description),date:r.date_value,startTime:String(r.start_time).slice(0,5),endTime:String(r.end_time).slice(0,5),clientId:clean(r.client_id),clientName:clientNames.get(r.client_id),assignedTo:r.assigned_to,assignedAvatar:clean(r.assigned_avatar),type:r.type,status:r.status,notes:clean(r.notes),locationOrLink:clean(r.location_or_link),createdAt:r.created_at })),
-    approvalRequests: (approvals.data ?? []).map(r => ({ id:r.id,title:r.title,description:r.description,clientId:r.client_id,clientName:clientNames.get(r.client_id) ?? '',projectId:clean(r.project_id),projectTitle:projectRows.find(p => p.id === r.project_id)?.title,assignedTo:r.assigned_to,assignedAvatar:clean(r.assigned_avatar),category:r.category,createdAt:r.created_at,dueDate:r.due_date,status:r.status,priority:r.priority,fileUrl:clean(r.file_url),fileType:clean(r.file_type),feedbackNotes:clean(r.feedback_notes),rejectionReason:clean(r.rejection_reason),revisionNotes:clean(r.revision_notes),reviewedBy:clean(r.reviewed_by),reviewedAt:clean(r.reviewed_at) })),
-    messages: (messages.data ?? []).map(r => ({ id:r.id,sender:r.sender,senderName:r.sender_name,content:r.content,timestamp:r.timestamp_value,clientId:r.client_id,projectId:clean(r.project_id),taskId:clean(r.task_id),mediaType:r.media_type,mediaUrl:clean(r.media_url) })),
-    communications: (communications.data ?? []).map(r => ({ id:r.id,clientId:r.client_id,projectId:clean(r.project_id),channel:r.channel,sender:r.sender,content:r.content,status:r.status,timestamp:r.timestamp_value })),
+    calendarEvents: [],
+    approvalRequests: [],
+    messages: [],
+    communications: [],
     timelineEvents: (timeline.data ?? []).map(r => ({ id:r.id,timestamp:r.timestamp_value,timeString:r.time_string,actor:r.actor,actorAvatar:clean(r.actor_avatar),action:r.action,details:clean(r.details),category:r.category,referenceId:clean(r.reference_id) })),
     // A fonte canônica da equipe é workspace_members, carregada pela API autenticada.
     team: [],
-    integrations: (integrations.data ?? []).map(r => ({ id:r.id,name:r.name,category:r.category,description:r.description,status:r.status,connectedAt:clean(r.connected_at),iconName:r.icon_name,details:clean(r.details) })),
+    integrations: [],
   };
 }
 
@@ -113,6 +110,7 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
 export async function loadWorkspacePatch(
   workspaceId: string,
   changedTables: RealtimeTable[],
+  range?: { from: number; to: number },
 ): Promise<Partial<WorkspaceState>> {
   if (!supabase || !workspaceId || changedTables.length === 0) return {};
 
@@ -128,24 +126,27 @@ export async function loadWorkspacePatch(
   const needTasks = requested.has('tasks') || clientsChanged;
   const needCalendar = requested.has('calendar_events') || clientsChanged;
   const needApprovals = requested.has('approval_requests') || projectAggregateChanged || clientsChanged;
+  const paginate = (table: string, query: any) => range && requested.has(table)
+    ? query.range(range.from, range.to)
+    : query;
 
   const queries: Record<string, PromiseLike<{ data: any[] | null; error: any }>> = {};
-  if (requested.has('leads')) queries.leads = supabase.from('leads').select('*').eq('workspace_id', workspaceId);
-  if (needClients) queries.clients = supabase.from('clients').select('*').eq('workspace_id', workspaceId);
-  if (requested.has('kanban_columns')) queries.columns = supabase.from('kanban_columns').select('*').eq('workspace_id', workspaceId).order('sort_order');
-  if (needProjects) queries.projects = supabase.from('projects').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false });
+  if (requested.has('leads')) queries.leads = paginate('leads', supabase.from('leads').select('*').eq('workspace_id', workspaceId));
+  if (needClients) queries.clients = paginate('clients', supabase.from('clients').select('*').eq('workspace_id', workspaceId));
+  if (requested.has('kanban_columns')) queries.columns = paginate('kanban_columns', supabase.from('kanban_columns').select('*').eq('workspace_id', workspaceId).order('sort_order'));
+  if (needProjects) queries.projects = paginate('projects', supabase.from('projects').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false }));
   if (needProjectAggregate) {
-    queries.deliverables = supabase.from('project_deliverables').select('*').eq('workspace_id', workspaceId);
-    queries.media = supabase.from('media_approvals').select('*').eq('workspace_id', workspaceId);
-    queries.comments = supabase.from('approval_comments').select('*').eq('workspace_id', workspaceId);
+    queries.deliverables = paginate('project_deliverables', supabase.from('project_deliverables').select('*').eq('workspace_id', workspaceId));
+    queries.media = paginate('media_approvals', supabase.from('media_approvals').select('*').eq('workspace_id', workspaceId));
+    queries.comments = paginate('approval_comments', supabase.from('approval_comments').select('*').eq('workspace_id', workspaceId));
   }
-  if (needTasks) queries.tasks = supabase.from('tasks').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false });
-  if (needCalendar) queries.calendar = supabase.from('calendar_events').select('*').eq('workspace_id', workspaceId).order('date_value');
-  if (needApprovals) queries.approvals = supabase.from('approval_requests').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false });
-  if (requested.has('messages')) queries.messages = supabase.from('messages').select('*').eq('workspace_id', workspaceId).order('timestamp_value');
-  if (requested.has('communications')) queries.communications = supabase.from('communications').select('*').eq('workspace_id', workspaceId).order('timestamp_value');
-  if (requested.has('timeline_events')) queries.timeline = supabase.from('timeline_events').select('*').eq('workspace_id', workspaceId).order('timestamp_value', { ascending:false });
-  if (requested.has('integrations')) queries.integrations = supabase.from('integrations').select('*').eq('workspace_id', workspaceId);
+  if (needTasks) queries.tasks = paginate('tasks', supabase.from('tasks').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false }));
+  if (needCalendar) queries.calendar = paginate('calendar_events', supabase.from('calendar_events').select('*').eq('workspace_id', workspaceId).order('date_value'));
+  if (needApprovals) queries.approvals = paginate('approval_requests', supabase.from('approval_requests').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending:false }));
+  if (requested.has('messages')) queries.messages = paginate('messages', supabase.from('messages').select('*').eq('workspace_id', workspaceId).order('timestamp_value'));
+  if (requested.has('communications')) queries.communications = paginate('communications', supabase.from('communications').select('*').eq('workspace_id', workspaceId).order('timestamp_value'));
+  if (requested.has('timeline_events')) queries.timeline = paginate('timeline_events', supabase.from('timeline_events').select('*').eq('workspace_id', workspaceId).order('timestamp_value', { ascending:false }));
+  if (requested.has('integrations')) queries.integrations = paginate('integrations', supabase.from('integrations').select('*').eq('workspace_id', workspaceId));
 
   const entries = await Promise.all(Object.entries(queries).map(async ([key, query]) => [key, await query] as const));
   const results = Object.fromEntries(entries) as Record<string, { data: Row[] | null; error: any }>;
