@@ -25,6 +25,7 @@ import { DEFAULT_KANBAN_COLUMNS } from '../data/defaults';
 import { getPlanDetails } from '../data/plans';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { loadProfile, loadWorkspace, loadWorkspacePatch } from '../lib/workspaceRepository';
+import type { WorkspaceState } from '../lib/workspaceRepository';
 import { convertLeadAtomic, entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
 import { uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
@@ -154,9 +155,13 @@ const EMPTY_USER: UserProfile = {
   companyName: '',
 };
 
-type DataModule = 'calendar' | 'approvals' | 'metrics' | 'communication' | 'activities' | 'integrations';
+type DataModule = 'leads' | 'clients' | 'projects' | 'tasks' | 'calendar' | 'approvals' | 'metrics' | 'communication' | 'activities' | 'integrations';
 
 const getDataModule = (view: ActiveView): DataModule | null => {
+  if (view === 'leads') return 'leads';
+  if (view === 'clients' || view === 'client_profile') return 'clients';
+  if (view === 'projects' || view === 'kanban' || view === 'project_detail') return 'projects';
+  if (view === 'tasks') return 'tasks';
   if (view === 'calendar' || view === 'schedule') return 'calendar';
   if (view === 'approvals' || view === 'approval') return 'approvals';
   if (view === 'operational_metrics' || view === 'metrics') return 'metrics';
@@ -167,6 +172,10 @@ const getDataModule = (view: ActiveView): DataModule | null => {
 };
 
 const DATA_MODULE_TABLES: Record<DataModule, RealtimeTable[]> = {
+  leads: ['leads'],
+  clients: ['clients'],
+  projects: ['projects', 'project_deliverables', 'media_approvals', 'approval_comments'],
+  tasks: ['tasks'],
   calendar: ['calendar_events'],
   approvals: ['approval_requests'],
   metrics: ['calendar_events', 'approval_requests'],
@@ -180,6 +189,21 @@ const mergeById = <T extends { id: string }>(current: T[], incoming: T[]): T[] =
   const items = new Map(current.map(item => [item.id, item]));
   incoming.forEach(item => items.set(item.id, item));
   return [...items.values()];
+};
+
+const getModulePageSize = (module: DataModule, patch: Partial<WorkspaceState>): number => {
+  switch (module) {
+    case 'leads': return patch.leads?.length ?? 0;
+    case 'clients': return patch.clients?.length ?? 0;
+    case 'projects': return patch.projects?.length ?? 0;
+    case 'tasks': return patch.tasks?.length ?? 0;
+    case 'calendar': return patch.calendarEvents?.length ?? 0;
+    case 'approvals': return patch.approvalRequests?.length ?? 0;
+    case 'metrics': return Math.max(patch.calendarEvents?.length ?? 0, patch.approvalRequests?.length ?? 0);
+    case 'communication': return Math.max(patch.messages?.length ?? 0, patch.communications?.length ?? 0);
+    case 'activities': return patch.timelineEvents?.length ?? 0;
+    case 'integrations': return patch.integrations?.length ?? 0;
+  }
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -287,10 +311,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       setAuthUserId(userId);
       setActiveWorkspaceId(bootstrap.workspaceId);
-      setLoadedDataModules(new Set());
+      setLoadedDataModules(new Set<DataModule>(['leads', 'clients', 'projects', 'tasks']));
       setDataModuleErrors({});
-      setDataModulePages({});
-      setDataModuleHasMore({});
+      setDataModulePages({ leads: 0, clients: 0, projects: 0, tasks: 0 });
+      setDataModuleHasMore({
+        leads: workspace.leads.length === MODULE_PAGE_SIZE,
+        clients: workspace.clients.length === MODULE_PAGE_SIZE,
+        projects: workspace.projects.length === MODULE_PAGE_SIZE,
+        tasks: workspace.tasks.length === MODULE_PAGE_SIZE,
+      });
       loadingDataModulesRef.current.clear();
       loadedUserRef.current = userId;
       setIsHydrated(true);
@@ -424,16 +453,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then(patch => {
         if (cancelled) return;
         if (patch.calendarEvents) setCalendarEvents(patch.calendarEvents);
+        if (patch.leads) setLeads(patch.leads);
+        if (patch.clients) setClients(patch.clients);
+        if (patch.projects) setProjects(patch.projects);
+        if (patch.tasks) setTasks(patch.tasks);
         if (patch.approvalRequests) setApprovalRequests(patch.approvalRequests);
         if (patch.messages) setMessages(patch.messages);
         if (patch.communications) setCommunications(patch.communications);
         if (patch.timelineEvents) setTimelineEvents(patch.timelineEvents);
         if (patch.integrations) setIntegrations(patch.integrations);
-        const pageSizes = [patch.calendarEvents?.length, patch.approvalRequests?.length,
-          patch.messages?.length, patch.communications?.length, patch.timelineEvents?.length, patch.integrations?.length]
-          .filter((size): size is number => typeof size === 'number');
         setDataModulePages(previous => ({ ...previous, [module]: 0 }));
-        setDataModuleHasMore(previous => ({ ...previous, [module]: Math.max(0, ...pageSizes) === MODULE_PAGE_SIZE }));
+        setDataModuleHasMore(previous => ({ ...previous, [module]: getModulePageSize(module, patch) === MODULE_PAGE_SIZE }));
         setLoadedDataModules(previous => {
           const next = new Set(previous);
           next.add(module);
@@ -482,16 +512,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         to: (nextPage + 1) * MODULE_PAGE_SIZE - 1,
       });
       if (patch.calendarEvents) setCalendarEvents(current => mergeById(current, patch.calendarEvents!));
+      if (patch.leads) setLeads(current => mergeById(current, patch.leads!));
+      if (patch.clients) setClients(current => mergeById(current, patch.clients!));
+      if (patch.projects) setProjects(current => mergeById(current, patch.projects!));
+      if (patch.tasks) setTasks(current => mergeById(current, patch.tasks!));
       if (patch.approvalRequests) setApprovalRequests(current => mergeById(current, patch.approvalRequests!));
       if (patch.messages) setMessages(current => mergeById(current, patch.messages!));
       if (patch.communications) setCommunications(current => mergeById(current, patch.communications!));
       if (patch.timelineEvents) setTimelineEvents(current => mergeById(current, patch.timelineEvents!));
       if (patch.integrations) setIntegrations(current => mergeById(current, patch.integrations!));
-      const pageSizes = [patch.calendarEvents?.length, patch.approvalRequests?.length,
-        patch.messages?.length, patch.communications?.length, patch.timelineEvents?.length, patch.integrations?.length]
-        .filter((size): size is number => typeof size === 'number');
       setDataModulePages(previous => ({ ...previous, [currentDataModule]: nextPage }));
-      setDataModuleHasMore(previous => ({ ...previous, [currentDataModule]: Math.max(0, ...pageSizes) === MODULE_PAGE_SIZE }));
+      setDataModuleHasMore(previous => ({ ...previous, [currentDataModule]: getModulePageSize(currentDataModule, patch) === MODULE_PAGE_SIZE }));
     } catch (error) {
       addToast('error', 'Mais registros não carregados', error instanceof Error ? error.message : 'Tente novamente.');
     } finally {
