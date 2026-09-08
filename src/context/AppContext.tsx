@@ -24,7 +24,7 @@ import {
 import { DEFAULT_KANBAN_COLUMNS } from '../data/defaults';
 import { getPlanDetails } from '../data/plans';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { loadProfile, loadWorkspace } from '../lib/workspaceRepository';
+import { loadProfile, loadWorkspace, loadWorkspacePatch } from '../lib/workspaceRepository';
 import { convertLeadAtomic, entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
 import { uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
@@ -162,6 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const authDestinationRef = useRef<ActiveView | null>(null);
   const loadedUserRef = useRef<string | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [isHydrated, setIsHydrated] = useState(!isSupabaseConfigured);
   const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
@@ -207,10 +208,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
-      await callServerApi('/api/session/bootstrap', { method: 'POST' });
+      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string }>('/api/session/bootstrap', { method: 'POST' });
       const [profile, workspace, canonicalTeam] = await Promise.all([
         loadProfile(userId),
-        loadWorkspace(userId),
+        loadWorkspace(bootstrap.workspaceId),
         fetchCanonicalTeam().catch(error => {
           console.error('StudioDesk: falha ao carregar diretório canônico da equipe', error);
           return null;
@@ -244,6 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       setAuthUserId(userId);
+      setActiveWorkspaceId(bootstrap.workspaceId);
       loadedUserRef.current = userId;
       setIsHydrated(true);
       const hasBusinessData = workspace.leads.length > 0 || workspace.clients.length > 0 || workspace.projects.length > 0 || workspace.tasks.length > 0;
@@ -274,6 +276,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!session?.user) {
         loadedUserRef.current = null;
         setAuthUserId(null);
+        setActiveWorkspaceId(null);
         setUserState(EMPTY_USER);
         setLeads([]);
         setClients([]);
@@ -357,10 +360,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Fase 6: Realtime. Um único canal multiplexa todas as entidades do workspace.
-  // Eventos próximos são agrupados para evitar uma nova carga completa por alteração.
+  // Realtime multiplexado: eventos próximos são agrupados e somente os grupos
+  // afetados são recarregados. Isso evita 15 consultas para cada alteração.
   useEffect(() => {
-    if (!supabase || !authUserId || !isHydrated) return;
+    if (!supabase || !authUserId || !activeWorkspaceId || !isHydrated) return;
 
     let cancelled = false;
     let channel: Awaited<ReturnType<typeof subscribeToWorkspaceRealtime>> = null;
@@ -372,27 +375,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (refreshTimer !== null) return;
       refreshTimer = window.setTimeout(async () => {
         refreshTimer = null;
-        if (cancelled || !authUserId) return;
+        if (cancelled || !activeWorkspaceId) return;
         const tables = [...pendingTables];
         pendingTables = new Set();
         try {
-          const workspace = await loadWorkspace(authUserId);
-          if (!workspace || cancelled) return;
-          if (workspace.leads) setLeads(workspace.leads);
-          if (workspace.clients) setClients(workspace.clients);
-          if (workspace.projects) setProjects(workspace.projects);
-          if (workspace.tasks) setTasks(workspace.tasks);
-          if (workspace.kanbanColumns) setKanbanColumns(workspace.kanbanColumns);
-          if (workspace.timelineEvents) setTimelineEvents(workspace.timelineEvents);
-          if (workspace.messages) setMessages(workspace.messages);
-          if (workspace.communications) setCommunications(workspace.communications);
-          if (workspace.calendarEvents) setCalendarEvents(workspace.calendarEvents);
-          if (workspace.approvalRequests) setApprovalRequests(workspace.approvalRequests);
-          if (workspace.team) setTeam(workspace.team);
-          if (workspace.integrations) setIntegrations(workspace.integrations);
-          if (tables.some(t => ['messages','communications'].includes(t))) {
-            // Mensagens/comunicações chegam sem toast para não interromper o fluxo de trabalho.
-          }
+          const teamChanged = tables.some(table => table === 'workspace_members' || table === 'team_members');
+          const dataTables = tables.filter(table => table !== 'workspace_members' && table !== 'team_members');
+          const [patch] = await Promise.all([
+            loadWorkspacePatch(activeWorkspaceId, dataTables),
+            teamChanged ? refreshTeam() : Promise.resolve(),
+          ]);
+          if (cancelled) return;
+          if (patch.leads) setLeads(patch.leads);
+          if (patch.clients) setClients(patch.clients);
+          if (patch.projects) setProjects(patch.projects);
+          if (patch.tasks) setTasks(patch.tasks);
+          if (patch.kanbanColumns) setKanbanColumns(patch.kanbanColumns.length ? patch.kanbanColumns : DEFAULT_KANBAN_COLUMNS);
+          if (patch.timelineEvents) setTimelineEvents(patch.timelineEvents);
+          if (patch.messages) setMessages(patch.messages);
+          if (patch.communications) setCommunications(patch.communications);
+          if (patch.calendarEvents) setCalendarEvents(patch.calendarEvents);
+          if (patch.approvalRequests) setApprovalRequests(patch.approvalRequests);
+          if (patch.integrations) setIntegrations(patch.integrations);
         } catch (error) {
           console.error('StudioDesk: falha ao atualizar dados em tempo real', error);
         }
@@ -405,7 +409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await removeRealtimeChannel(channel);
         channel = null;
       }
-      channel = await subscribeToWorkspaceRealtime(authUserId, {
+      channel = await subscribeToWorkspaceRealtime(activeWorkspaceId, {
         onChange: (table) => {
           pendingTables.add(table);
           scheduleRefresh();
@@ -431,7 +435,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer);
       void removeRealtimeChannel(channel);
     };
-  }, [authUserId, isHydrated]);
+  }, [authUserId, activeWorkspaceId, isHydrated]);
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) return { error: 'Supabase não está configurado. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.' };

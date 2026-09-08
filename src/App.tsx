@@ -6,32 +6,41 @@ import { InvitePasswordSetup } from './components/auth/InvitePasswordSetup';
 import { ProfileSelection } from './components/onboarding/ProfileSelection';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { FirstAccessChecklist } from './components/onboarding/FirstAccessChecklist';
-import { DashboardView } from './components/dashboard/DashboardView';
-import { LeadsView } from './components/leads/LeadsView';
-import { ClientsView } from './components/clients/ClientsView';
-import { ClientProfileView } from './components/clients/ClientProfileView';
-import { KanbanBoardView } from './components/projects/KanbanBoardView';
-import { ProjectsListView } from './components/projects/ProjectsListView';
-import { ProjectDetailView } from './components/projects/ProjectDetailView';
-import { TasksView } from './components/tasks/TasksView';
-import { CalendarView } from './components/calendar/CalendarView';
-import { ApprovalsView } from './components/approvals/ApprovalsView';
-import { OperationalMetricsView } from './components/metrics/OperationalMetricsView';
-import { ActivitiesView } from './components/activities/ActivitiesView';
-import { CommunicationHubView } from './components/communication/CommunicationHubView';
-import { IntegrationsView } from './components/integrations/IntegrationsView';
-import { TeamView } from './components/team/TeamView';
 import { TeamInviteJoin } from './components/team/TeamInviteJoin';
-import { SettingsView } from './components/settings/SettingsView';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { ToastContainer } from './components/common/Toast';
-import { GlobalSearchModal } from './components/common/GlobalSearchModal';
-import { LeadModal } from './components/leads/LeadModal';
-import { ClientModal } from './components/clients/ClientModal';
-import { ProjectModal } from './components/projects/ProjectModal';
 import { AccessDenied } from './components/common/AccessDenied';
 import { viewPermission } from './lib/permissions';
+
+// Telas autenticadas e modais pesados são baixados somente quando usados.
+// Isso mantém a restauração da sessão e o dashboard inicial mais leves.
+const DashboardView = React.lazy(() => import('./components/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
+const LeadsView = React.lazy(() => import('./components/leads/LeadsView').then(m => ({ default: m.LeadsView })));
+const ClientsView = React.lazy(() => import('./components/clients/ClientsView').then(m => ({ default: m.ClientsView })));
+const ClientProfileView = React.lazy(() => import('./components/clients/ClientProfileView').then(m => ({ default: m.ClientProfileView })));
+const KanbanBoardView = React.lazy(() => import('./components/projects/KanbanBoardView').then(m => ({ default: m.KanbanBoardView })));
+const ProjectsListView = React.lazy(() => import('./components/projects/ProjectsListView').then(m => ({ default: m.ProjectsListView })));
+const ProjectDetailView = React.lazy(() => import('./components/projects/ProjectDetailView').then(m => ({ default: m.ProjectDetailView })));
+const TasksView = React.lazy(() => import('./components/tasks/TasksView').then(m => ({ default: m.TasksView })));
+const CalendarView = React.lazy(() => import('./components/calendar/CalendarView').then(m => ({ default: m.CalendarView })));
+const ApprovalsView = React.lazy(() => import('./components/approvals/ApprovalsView').then(m => ({ default: m.ApprovalsView })));
+const OperationalMetricsView = React.lazy(() => import('./components/metrics/OperationalMetricsView').then(m => ({ default: m.OperationalMetricsView })));
+const ActivitiesView = React.lazy(() => import('./components/activities/ActivitiesView').then(m => ({ default: m.ActivitiesView })));
+const CommunicationHubView = React.lazy(() => import('./components/communication/CommunicationHubView').then(m => ({ default: m.CommunicationHubView })));
+const IntegrationsView = React.lazy(() => import('./components/integrations/IntegrationsView').then(m => ({ default: m.IntegrationsView })));
+const TeamView = React.lazy(() => import('./components/team/TeamView').then(m => ({ default: m.TeamView })));
+const SettingsView = React.lazy(() => import('./components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
+const GlobalSearchModal = React.lazy(() => import('./components/common/GlobalSearchModal').then(m => ({ default: m.GlobalSearchModal })));
+const LeadModal = React.lazy(() => import('./components/leads/LeadModal').then(m => ({ default: m.LeadModal })));
+const ClientModal = React.lazy(() => import('./components/clients/ClientModal').then(m => ({ default: m.ClientModal })));
+const ProjectModal = React.lazy(() => import('./components/projects/ProjectModal').then(m => ({ default: m.ProjectModal })));
+
+const ViewLoading = () => (
+  <div className="flex min-h-[240px] items-center justify-center text-xs font-bold text-[#6B7280]">
+    Carregando módulo...
+  </div>
+);
 
 export const App: React.FC = () => {
   const { currentView, setCurrentView, user, isAuthenticated, authReady, can, workspaceStatus, workspaceError, retryWorkspaceLoad, signOut } = useApp();
@@ -131,7 +140,7 @@ export const App: React.FC = () => {
 
             <main className="h-full min-w-0 overflow-y-auto bg-[#F5F7F9] pb-16 lg:ml-64">
               {restrictedView ? <AccessDenied /> : null}
-              {!restrictedView ? <>
+              {!restrictedView ? <React.Suspense fallback={<ViewLoading />}>
               {currentView === 'dashboard' && (
                 <DashboardView onOpenQuickCreate={handleOpenQuickCreate} />
               )}
@@ -152,7 +161,7 @@ export const App: React.FC = () => {
               {currentView === 'integrations' && <IntegrationsView />}
               {currentView === 'team' && <TeamView />}
               {currentView === 'settings' && <SettingsView />}
-              </> : null}
+              </React.Suspense> : null}
             </main>
           </div>
         </div>
@@ -160,6 +169,7 @@ export const App: React.FC = () => {
 
       {/* Global Modals & Notifications */}
       <ToastContainer />
+      <React.Suspense fallback={null}>
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <InvitePasswordSetup />
       <TeamInviteJoin />
@@ -179,6 +189,7 @@ export const App: React.FC = () => {
         onClose={() => setIsProjectModalOpen(false)}
         defaultClientId={defaultClientIdForProject}
       />
+      </React.Suspense>
     </div>
   );
 };

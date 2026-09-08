@@ -1,6 +1,5 @@
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { getWorkspaceId } from './workspaceRepository';
 
 export const REALTIME_TABLES = [
   'leads',
@@ -16,6 +15,7 @@ export const REALTIME_TABLES = [
   'messages',
   'communications',
   'timeline_events',
+  'workspace_members',
   'team_members',
   'integrations',
 ] as const;
@@ -33,12 +33,10 @@ interface SubscribeOptions {
  * A single channel is cheaper and easier to manage than one channel per table.
  */
 export async function subscribeToWorkspaceRealtime(
-  userId: string,
+  workspaceId: string,
   options: SubscribeOptions,
 ): Promise<RealtimeChannel | null> {
   if (!supabase) return null;
-
-  const workspaceId = await getWorkspaceId(userId);
   if (!workspaceId) return null;
 
   const channel = supabase.channel(`workspace-realtime:${workspaceId}`);

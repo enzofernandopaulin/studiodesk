@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Sparkles, Link2, Copy, RefreshCw } from 'lucide-react';
 import { getPlanDetails } from '../../data/plans';
@@ -37,17 +37,6 @@ export const TeamView: React.FC = () => {
       if (!silent) setIsRefreshingTeam(false);
     }
   };
-
-  useEffect(() => {
-    void reloadTeam(true);
-    const timer = window.setInterval(() => void reloadTeam(true), 15000);
-    const onFocus = () => void reloadTeam(true);
-    window.addEventListener('focus', onFocus);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('focus', onFocus);
-    };
-  }, []);
 
   const planDetails = getPlanDetails(user.plan);
   const currentMembersCount = team.length;

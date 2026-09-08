@@ -371,7 +371,7 @@ begin
   foreach t in array array[
     'leads','clients','kanban_columns','projects','project_deliverables','media_approvals',
     'approval_comments','approval_requests','calendar_events','tasks','messages',
-    'communications','timeline_events','team_members','integrations'
+    'communications','timeline_events','workspace_members','team_members','integrations'
   ] loop
     execute format('drop policy if exists "workspace_member_all" on public.%I', t);
     execute format('create policy "workspace_member_all" on public.%I for all to authenticated using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id))', t);
@@ -924,7 +924,7 @@ begin
   foreach t in array array[
     'leads','clients','kanban_columns','projects','project_deliverables','media_approvals',
     'approval_comments','approval_requests','calendar_events','tasks','messages',
-    'communications','timeline_events','team_members','integrations'
+    'communications','timeline_events','workspace_members','team_members','integrations'
   ] loop
     execute format('alter table public.%I replica identity full', t);
   end loop;
