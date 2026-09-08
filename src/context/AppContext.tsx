@@ -24,8 +24,8 @@ import {
 import { DEFAULT_KANBAN_COLUMNS } from '../data/defaults';
 import { getPlanDetails } from '../data/plans';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { loadProfile, loadWorkspace, saveProfile, WorkspaceState } from '../lib/workspaceRepository';
-import { entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
+import { loadProfile, loadWorkspace } from '../lib/workspaceRepository';
+import { convertLeadAtomic, entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
 import { uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
 import { subscribeToWorkspaceRealtime, removeRealtimeChannel, RealtimeTable } from '../lib/realtimeRepository';
@@ -62,18 +62,18 @@ interface AppContextType {
   timelineEvents: TimelineEvent[];
   messages: Message[];
   communications: Communication[];
-  addCommunication: (comm: Omit<Communication, 'id' | 'timestamp'>) => void;
+  addCommunication: (comm: Omit<Communication, 'id' | 'timestamp'>) => Promise<void>;
   calendarEvents: CalendarEvent[];
-  addCalendarEvent: (event: Omit<CalendarEvent, 'id' | 'createdAt'>) => CalendarEvent;
-  updateCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => void;
-  deleteCalendarEvent: (id: string) => void;
-  toggleCalendarEventStatus: (id: string, status: CalendarEventStatus) => void;
+  addCalendarEvent: (event: Omit<CalendarEvent, 'id' | 'createdAt'>) => Promise<CalendarEvent>;
+  updateCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => Promise<void>;
+  deleteCalendarEvent: (id: string) => Promise<void>;
+  toggleCalendarEventStatus: (id: string, status: CalendarEventStatus) => Promise<void>;
   approvalRequests: ApprovalRequest[];
-  addApprovalRequest: (req: Omit<ApprovalRequest, 'id' | 'createdAt'>) => ApprovalRequest;
-  updateApprovalRequest: (id: string, updates: Partial<ApprovalRequest>) => void;
-  deleteApprovalRequest: (id: string) => void;
-  updateApprovalStatus: (id: string, status: ApprovalStatus, notes?: string, reviewedBy?: string) => void;
-  updateProjectApproval: (projectId: string, status: 'pendente' | 'aprovado' | 'ajustes_solicitados', comments: ApprovalComment[]) => void;
+  addApprovalRequest: (req: Omit<ApprovalRequest, 'id' | 'createdAt'>) => Promise<ApprovalRequest>;
+  updateApprovalRequest: (id: string, updates: Partial<ApprovalRequest>) => Promise<void>;
+  deleteApprovalRequest: (id: string) => Promise<void>;
+  updateApprovalStatus: (id: string, status: ApprovalStatus, notes?: string, reviewedBy?: string) => Promise<void>;
+  updateProjectApproval: (projectId: string, status: 'pendente' | 'aprovado' | 'ajustes_solicitados', comments: ApprovalComment[]) => Promise<void>;
   uploadProjectMedia: (projectId: string, file: File, kind: 'video' | 'thumbnail') => Promise<void>;
   team: TeamMember[];
   integrations: IntegrationItem[];
@@ -88,40 +88,43 @@ interface AppContextType {
   removeToast: (id: string) => void;
   
   // Actions
-  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Lead;
-  updateLead: (id: string, updates: Partial<Lead>) => void;
-  deleteLead: (id: string) => void;
-  convertLeadToClient: (leadId: string, createProject?: boolean, projectTitle?: string) => { client: Client; project?: Project };
+  addLead: (lead: Omit<Lead, 'id' | 'createdAt'>) => Promise<Lead>;
+  updateLead: (id: string, updates: Partial<Lead>) => Promise<void>;
+  deleteLead: (id: string) => Promise<void>;
+  convertLeadToClient: (leadId: string, createProject?: boolean, projectTitle?: string) => Promise<{ client: Client; project?: Project }>;
   
-  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => Client;
-  updateClient: (id: string, updates: Partial<Client>) => void;
-  deleteClient: (id: string) => void;
+  addClient: (client: Omit<Client, 'id' | 'createdAt'>) => Promise<Client>;
+  updateClient: (id: string, updates: Partial<Client>) => Promise<void>;
+  deleteClient: (id: string) => Promise<void>;
   
-  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => Project;
-  updateProject: (id: string, updates: Partial<Project>) => void;
-  moveProjectToColumn: (projectId: string, targetColumnId: string) => void;
-  moveProjectColumn: (projectId: string, targetColumnId: string) => void;
-  deleteProject: (id: string) => void;
-  submitProjectFeedback: (projectId: string, deliverableId: string, status: 'aprovado' | 'alteracoes_solicitadas', feedbackNotes: string) => void;
+  addProject: (project: Omit<Project, 'id' | 'createdAt'>) => Promise<Project>;
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
+  moveProjectToColumn: (projectId: string, targetColumnId: string) => Promise<void>;
+  moveProjectColumn: (projectId: string, targetColumnId: string) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
+  submitProjectFeedback: (projectId: string, deliverableId: string, status: 'aprovado' | 'alteracoes_solicitadas', feedbackNotes: string) => Promise<void>;
   
-  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => Task;
-  toggleTaskCompleted: (taskId: string) => void;
-  deleteTask: (taskId: string) => void;
+  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => Promise<Task>;
+  toggleTaskCompleted: (taskId: string) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
   
-  addKanbanColumn: (title: string, color?: string) => void;
-  updateKanbanColumn: (id: string, title: string, color?: string) => void;
-  deleteKanbanColumn: (id: string) => void;
+  addKanbanColumn: (title: string, color?: string) => Promise<void>;
+  updateKanbanColumn: (id: string, title: string, color?: string) => Promise<void>;
+  deleteKanbanColumn: (id: string) => Promise<void>;
   
-  sendMessage: (clientId: string, content: string, projectId?: string, mediaType?: 'text' | 'audio' | 'video' | 'file') => void;
-  addTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => void;
+  sendMessage: (clientId: string, content: string, projectId?: string, mediaType?: 'text' | 'audio' | 'video' | 'file') => Promise<void>;
+  addTeamMember: (member: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => Promise<void>;
   removeTeamMember: (id: string) => Promise<boolean>;
   refreshTeam: () => Promise<void>;
-  toggleIntegration: (id: string) => void;
+  toggleIntegration: (id: string) => Promise<void>;
   
   // Authentication / persistence
   isSupabaseConfigured: boolean;
   isAuthenticated: boolean;
   authReady: boolean;
+  workspaceStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+  workspaceError: string;
+  retryWorkspaceLoad: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
   signUp: (name: string, email: string, password: string, companyName: string) => Promise<{ error?: string; needsEmailConfirmation?: boolean }>;
   signOut: () => Promise<void>;
@@ -145,23 +148,6 @@ const EMPTY_USER: UserProfile = {
   companyName: '',
 };
 
-const EMPTY_WORKSPACE: WorkspaceState = {
-  leads: [],
-  clients: [],
-  projects: [],
-  tasks: [],
-  // Kanban columns are structural defaults for new workspaces.
-  kanbanColumns: DEFAULT_KANBAN_COLUMNS,
-  timelineEvents: [],
-  messages: [],
-  communications: [],
-  calendarEvents: [],
-  approvalRequests: [],
-  team: [],
-  integrations: [],
-};
-
-
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentView, setCurrentView] = useState<ActiveView>('landing');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
@@ -175,8 +161,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // forcing a rewrite of every screen at once.
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const authDestinationRef = useRef<ActiveView | null>(null);
+  const loadedUserRef = useRef<string | null>(null);
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [isHydrated, setIsHydrated] = useState(!isSupabaseConfigured);
+  const [workspaceStatus, setWorkspaceStatus] = useState<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle');
+  const [workspaceError, setWorkspaceError] = useState('');
 
   const [user, setUserState] = useState<UserProfile>(EMPTY_USER);
   const setUser: React.Dispatch<React.SetStateAction<UserProfile>> = (update) => {
@@ -210,24 +199,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
 
-  const buildWorkspaceState = (): WorkspaceState => ({
-    leads,
-    clients,
-    projects,
-    tasks,
-    kanbanColumns,
-    timelineEvents,
-    messages,
-    communications,
-    calendarEvents,
-    approvalRequests,
-    team,
-    integrations,
-  });
-
   const loadAuthenticatedData = async (userId: string) => {
     if (!supabase) return;
 
+    setWorkspaceStatus('loading');
+    setWorkspaceError('');
     try {
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
@@ -251,27 +227,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...profile,
       }));
 
-      if (!workspace) {
-        // O bootstrap do servidor já garantiu perfil e membership. Um workspace
-        // vazio não precisa executar a antiga RPC de sincronização destrutiva.
-        setLeads([]);
-        setClients([]);
-        setProjects([]);
-        setTasks([]);
-        setKanbanColumns(DEFAULT_KANBAN_COLUMNS);
-        setTimelineEvents([]);
-        setMessages([]);
-        setCommunications([]);
-        setCalendarEvents([]);
-        setApprovalRequests([]);
-        setTeam(canonicalTeam ?? []);
-        setIntegrations([]);
-      } else {
+      if (!workspace) throw new Error('A conta não possui um workspace ativo válido.');
+      {
         setLeads(workspace.leads ?? []);
         setClients(workspace.clients ?? []);
         setProjects(workspace.projects ?? []);
         setTasks(workspace.tasks ?? []);
-        setKanbanColumns(workspace.kanbanColumns ?? []);
+        setKanbanColumns(workspace.kanbanColumns.length ? workspace.kanbanColumns : DEFAULT_KANBAN_COLUMNS);
         setTimelineEvents(workspace.timelineEvents ?? []);
         setMessages(workspace.messages ?? []);
         setCommunications(workspace.communications ?? []);
@@ -282,28 +244,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       setAuthUserId(userId);
+      loadedUserRef.current = userId;
       setIsHydrated(true);
+      const hasBusinessData = workspace.leads.length > 0 || workspace.clients.length > 0 || workspace.projects.length > 0 || workspace.tasks.length > 0;
+      setWorkspaceStatus(hasBusinessData ? 'ready' : 'empty');
       return !profile.businessType || !profile.teamSize;
     } catch (error) {
       console.error('StudioDesk: falha ao carregar dados do Supabase', error);
       const message = error instanceof Error ? error.message : 'Não foi possível carregar seu workspace.';
-      addToast('error', 'Falha ao carregar a nuvem', `${message} Sua sessão foi mantida para que você possa tentar novamente ou aceitar um convite.`);
+      addToast('error', 'Falha ao carregar a nuvem', `${message} Nenhum dado local foi sobrescrito.`);
       setAuthUserId(userId);
-      setUserState(prev => ({ ...prev, id: userId }));
-      setLeads([]);
-      setClients([]);
-      setProjects([]);
-      setTasks([]);
-      setKanbanColumns(DEFAULT_KANBAN_COLUMNS);
-      setTimelineEvents([]);
-      setMessages([]);
-      setCommunications([]);
-      setCalendarEvents([]);
-      setApprovalRequests([]);
-      setTeam([]);
-      setIntegrations([]);
-      setIsHydrated(true);
-      return true;
+      setIsHydrated(false);
+      setWorkspaceStatus('error');
+      setWorkspaceError(message);
+      return null;
     }
   };
 
@@ -318,6 +272,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!mounted) return;
 
       if (!session?.user) {
+        loadedUserRef.current = null;
         setAuthUserId(null);
         setUserState(EMPTY_USER);
         setLeads([]);
@@ -333,6 +288,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTeam([]);
         setIntegrations([]);
         setIsHydrated(true);
+        setWorkspaceStatus('idle');
+        setWorkspaceError('');
         setAuthReady(true);
         if (event === 'SIGNED_OUT') setCurrentView('landing');
         return;
@@ -346,9 +303,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthReady(true);
         return;
       }
-      await refreshRole(session.user.id);
-
-      if (!mounted || sequence !== authSequence) return;
       setAuthReady(true);
 
       // O Supabase persiste a sessão no navegador. Ao recarregar, retomamos a
@@ -369,11 +323,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
 
-    void supabase.auth.getSession().then(({ data: { session } }) => applySession(session));
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      void applySession(session, event);
+      if (event === 'SIGNED_IN' && session?.user.id === loadedUserRef.current) return;
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') {
+        void applySession(session, event);
+      }
     });
 
     return () => {
@@ -382,22 +337,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Fase 3: cada mutação de domínio persiste diretamente na tabela correspondente.
-  // Mantemos apenas a persistência de perfil separada, pois o onboarding altera esse objeto.
-  useEffect(() => {
-    if (!supabase || !authUserId || !isHydrated) return;
-    const timer = window.setTimeout(() => {
-      void saveProfile(user).catch(error => console.error('StudioDesk: falha ao salvar perfil', error));
-    }, 500);
-    return () => window.clearTimeout(timer);
-  }, [authUserId, isHydrated, user]);
+  const retryWorkspaceLoad = async () => {
+    if (!authUserId) return;
+    setAuthReady(false);
+    const needsOnboarding = await loadAuthenticatedData(authUserId);
+    setAuthReady(true);
+    if (needsOnboarding === true) setCurrentView('profile_select');
+    else if (needsOnboarding === false) setCurrentView('dashboard');
+  };
 
-  const persist = (operation: Promise<void>, message = 'A alteração não pôde ser sincronizada com a nuvem.') => {
-    if (!supabase || !authUserId) return;
-    void operation.catch(error => {
-      console.error('StudioDesk: falha na persistência', error);
-      addToast('error', 'Sincronização pendente', message);
-    });
+  const persistConfirmed = async (operation: Promise<void>, message: string) => {
+    try {
+      await operation;
+    } catch (error) {
+      console.error('StudioDesk: mutação não confirmada', error);
+      const detail = error instanceof Error ? error.message : message;
+      addToast('error', 'Alteração não salva', detail || message);
+      throw error;
+    }
   };
 
   // Fase 6: Realtime. Um único canal multiplexa todas as entidades do workspace.
@@ -475,12 +432,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       void removeRealtimeChannel(channel);
     };
   }, [authUserId, isHydrated]);
-
-  const refreshRole = async (userId: string) => {
-    if (!supabase) return;
-    const { data } = await supabase.from('profiles').select('role, workspace_id').eq('id', userId).maybeSingle();
-    if (data?.role) setUserState(prev => ({ ...prev, role: data.role as UserProfile['role'] }));
-  };
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) return { error: 'Supabase não está configurado. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.' };
@@ -580,7 +531,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const now = new Date();
     const timeString = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const newEvt: TimelineEvent = {
-      id: 'evt_' + Date.now(),
+      id: `evt_${crypto.randomUUID()}`,
       timestamp: now.toISOString(),
       timeString,
       actor,
@@ -589,58 +540,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       category,
       referenceId
     };
-    setTimelineEvents(prev => [newEvt, ...prev]);
-    persist(entityRepository.timeline.upsert(authUserId || '', newEvt), 'A atividade foi registrada localmente, mas não pôde ser sincronizada.');
+    void persistConfirmed(entityRepository.timeline.upsert(authUserId || '', newEvt), 'A atividade não pôde ser registrada.')
+      .then(() => setTimelineEvents(prev => [newEvt, ...prev]));
   };
 
   const setPlan = (plan: PlanType) => {
     const details = getPlanDetails(plan);
     setUser(prev => ({ ...prev, plan }));
-    addToast('info', `Plano ${details.name} Ativo`, `${details.icon} Modo ${details.name} (${details.userLimitText}) ativado com sucesso.`);
+    addToast('info', `Plano ${details.name} selecionado`, `${details.icon} A escolha será confirmada ao concluir a configuração.`);
   };
 
   // Lead CRUD
-  const addLead = (leadData: Omit<Lead, 'id' | 'createdAt'>): Lead => {
+  const addLead = async (leadData: Omit<Lead, 'id' | 'createdAt'>): Promise<Lead> => {
     if (denyAction('manage:crm')) throw new Error('Permissão insuficiente');
     const newLead: Lead = {
       ...leadData,
-      id: 'lead_' + Date.now(),
+      id: `lead_${crypto.randomUUID()}`,
       createdAt: new Date().toISOString()
     };
+    await persistConfirmed(entityRepository.lead.upsert(authUserId || '', newLead), 'O lead não pôde ser salvo na nuvem.');
     setLeads(prev => [newLead, ...prev]);
-    persist(entityRepository.lead.upsert(authUserId || '', newLead), 'O lead foi criado na interface, mas não pôde ser salvo na nuvem.');
     addTimelineEvent(user.name, 'cadastrou novo lead', `${newLead.name} (${newLead.company}) cadastrado no CRM.`, 'lead', newLead.id);
     addToast('success', 'Lead Cadastrado', `${newLead.name} foi adicionado ao funil de leads.`);
     return newLead;
   };
 
-  const updateLead = (id: string, updates: Partial<Lead>) => {
+  const updateLead = async (id: string, updates: Partial<Lead>) => {
     if (denyAction('manage:crm')) return;
     const current = leads.find(l => l.id === id);
     if (!current) return;
     const next = { ...current, ...updates };
+    await persistConfirmed(entityRepository.lead.upsert(authUserId || '', next), 'O lead não pôde ser atualizado.');
     setLeads(prev => prev.map(l => l.id === id ? next : l));
-    persist(entityRepository.lead.upsert(authUserId || '', next), 'O lead foi atualizado localmente, mas a nuvem não confirmou a alteração.');
     addToast('info', 'Lead Atualizado', 'As informações do lead foram atualizadas.');
   };
 
-  const deleteLead = (id: string) => {
+  const deleteLead = async (id: string) => {
     if (denyAction('manage:crm')) return;
+    await persistConfirmed(entityRepository.lead.delete(authUserId || '', id), 'O lead não pôde ser excluído.');
     setLeads(prev => prev.filter(l => l.id !== id));
-    persist(entityRepository.lead.delete(authUserId || '', id), 'O lead foi removido da tela, mas a nuvem não confirmou a exclusão.');
     addToast('warning', 'Lead Removido', 'O lead foi excluído com sucesso.');
   };
 
-  const convertLeadToClient = (leadId: string, createProject: boolean = true, projectTitle?: string) => {
+  const convertLeadToClient = async (leadId: string, createProject: boolean = true, projectTitle?: string) => {
+    if (denyAction('manage:crm')) throw new Error('Permissão insuficiente');
     const lead = leads.find(l => l.id === leadId);
     if (!lead) throw new Error('Lead não encontrado');
 
-    // 1. Mark lead as converted
-    updateLead(leadId, { status: 'convertido' });
-
     // 2. Create client
     const newClient: Client = {
-      id: 'client_' + Date.now(),
+      id: `client_${crypto.randomUUID()}`,
       name: lead.name,
       company: lead.company,
       email: lead.email,
@@ -654,13 +603,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString(),
       leadOriginId: lead.id
     };
-    setClients(prev => [newClient, ...prev]);
-
     let createdProject: Project | undefined;
     if (createProject) {
       const defaultColumn = kanbanColumns[0] || DEFAULT_KANBAN_COLUMNS[0];
       createdProject = {
-        id: 'proj_' + Date.now(),
+        id: `proj_${crypto.randomUUID()}`,
         title: projectTitle || `Projeto Inicial — ${lead.company}`,
         clientId: newClient.id,
         clientName: newClient.company || newClient.name,
@@ -676,82 +623,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         progress: 10,
         createdAt: new Date().toISOString()
       };
-      setProjects(prev => [createdProject!, ...prev]);
-      persist(upsertProjectAggregate(authUserId || '', createdProject!), 'O projeto da conversão foi criado localmente, mas não pôde ser salvo na nuvem.');
     }
 
-    addTimelineEvent(
-      user.name,
-      'converteu lead em cliente ativo',
-      `${lead.name} (${lead.company}) agora é um cliente ativo.${createdProject ? ` Projeto "${createdProject.title}" criado no Kanban.` : ''}`,
-      'cliente',
-      newClient.id
-    );
+    const now = new Date();
+    const event: TimelineEvent = {
+      id: `evt_${crypto.randomUUID()}`,
+      timestamp: now.toISOString(),
+      timeString: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      actor: user.name,
+      action: 'converteu lead em cliente ativo',
+      details: `${lead.name} (${lead.company}) agora é um cliente ativo.${createdProject ? ` Projeto "${createdProject.title}" criado no Kanban.` : ''}`,
+      category: 'cliente',
+      referenceId: newClient.id,
+    };
+
+    try {
+      await convertLeadAtomic(leadId, newClient, createdProject, event);
+    } catch (error) {
+      addToast('error', 'Conversão não realizada', error instanceof Error ? error.message : 'O Supabase não confirmou a conversão.');
+      throw error;
+    }
+
+    setLeads(prev => prev.map(item => item.id === leadId ? { ...item, status: 'convertido' } : item));
+    setClients(prev => [newClient, ...prev]);
+    if (createdProject) setProjects(prev => [createdProject!, ...prev]);
+    setTimelineEvents(prev => [event, ...prev]);
 
     addToast('success', 'Lead Convertido com Sucesso!', `${lead.name} agora é um cliente ativo e está disponível no CRM.`);
     return { client: newClient, project: createdProject };
   };
 
   // Client CRUD
-  const addClient = (clientData: Omit<Client, 'id' | 'createdAt'>): Client => {
+  const addClient = async (clientData: Omit<Client, 'id' | 'createdAt'>): Promise<Client> => {
     if (denyAction('manage:crm')) throw new Error('Permissão insuficiente');
     const newClient: Client = {
       ...clientData,
-      id: 'client_' + Date.now(),
+      id: `client_${crypto.randomUUID()}`,
       createdAt: new Date().toISOString()
     };
+    await persistConfirmed(entityRepository.client.upsert(authUserId || '', newClient), 'O cliente não pôde ser salvo na nuvem.');
     setClients(prev => [newClient, ...prev]);
-    persist(entityRepository.client.upsert(authUserId || '', newClient), 'O cliente foi criado localmente, mas não pôde ser salvo na nuvem.');
     addTimelineEvent(user.name, 'adicionou novo cliente', `${newClient.name} (${newClient.company}) registrado no sistema.`, 'cliente', newClient.id);
     addToast('success', 'Cliente Cadastrado', `${newClient.name} foi adicionado à carteira.`);
     return newClient;
   };
 
-  const updateClient = (id: string, updates: Partial<Client>) => {
+  const updateClient = async (id: string, updates: Partial<Client>) => {
     if (denyAction('manage:crm')) return;
     const current = clients.find(c => c.id === id);
     if (!current) return;
     const next = { ...current, ...updates };
+    await persistConfirmed(entityRepository.client.upsert(authUserId || '', next), 'O cliente não pôde ser atualizado.');
     setClients(prev => prev.map(c => c.id === id ? next : c));
-    persist(entityRepository.client.upsert(authUserId || '', next), 'O cliente foi atualizado localmente, mas a nuvem não confirmou a alteração.');
     addToast('info', 'Cliente Atualizado', 'Dados do cliente atualizados.');
   };
 
-  const deleteClient = (id: string) => {
+  const deleteClient = async (id: string) => {
     if (denyAction('manage:crm')) return;
+    await persistConfirmed(entityRepository.client.delete(authUserId || '', id), 'O cliente não pôde ser excluído.');
     setClients(prev => prev.filter(c => c.id !== id));
-    persist(entityRepository.client.delete(authUserId || '', id), 'O cliente foi removido da tela, mas a nuvem não confirmou a exclusão.');
     addToast('warning', 'Cliente Removido', 'O cliente foi excluído.');
   };
 
   // Project CRUD & Kanban
-  const addProject = (projectData: Omit<Project, 'id' | 'createdAt'>): Project => {
+  const addProject = async (projectData: Omit<Project, 'id' | 'createdAt'>): Promise<Project> => {
     if (denyAction('manage:projects')) throw new Error('Permissão insuficiente');
     const col = kanbanColumns.find(c => c.id === projectData.columnId) || kanbanColumns[0];
     const newProject: Project = {
       ...projectData,
-      id: 'proj_' + Date.now(),
+      id: `proj_${crypto.randomUUID()}`,
       status: col ? col.title : 'BRIEFING & ROTEIRO',
       createdAt: new Date().toISOString()
     };
+    await persistConfirmed(upsertProjectAggregate(authUserId || '', newProject), 'O projeto não pôde ser salvo na nuvem.');
     setProjects(prev => [newProject, ...prev]);
-    persist(upsertProjectAggregate(authUserId || '', newProject), 'O projeto foi criado localmente, mas não pôde ser salvo na nuvem.');
     addTimelineEvent(user.name, 'criou um novo projeto', `Projeto "${newProject.title}" para ${newProject.clientName} adicionado à coluna ${newProject.status}.`, 'projeto', newProject.id);
     addToast('success', 'Projeto Criado', `"${newProject.title}" adicionado automaticamente ao Kanban.`);
     return newProject;
   };
 
-  const updateProject = (id: string, updates: Partial<Project>) => {
+  const updateProject = async (id: string, updates: Partial<Project>) => {
     if (denyAction('manage:projects')) return;
     const current = projects.find(p => p.id === id);
     if (!current) return;
     const next = { ...current, ...updates };
+    await persistConfirmed(upsertProjectAggregate(authUserId || '', next), 'O projeto não pôde ser atualizado.');
     setProjects(prev => prev.map(p => p.id === id ? next : p));
-    persist(upsertProjectAggregate(authUserId || '', next), 'O projeto foi atualizado localmente, mas a nuvem não confirmou a alteração.');
     addToast('info', 'Projeto Atualizado', 'Alterações salvas.');
   };
 
-  const moveProjectToColumn = (projectId: string, targetColumnId: string) => {
+  const moveProjectToColumn = async (projectId: string, targetColumnId: string) => {
     if (denyAction('manage:kanban')) return;
     const project = projects.find(p => p.id === projectId);
     const targetCol = kanbanColumns.find(c => c.id === targetColumnId);
@@ -768,8 +729,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: targetCol.title,
       progress: targetColumnId === 'col_concluido' ? 100 : (targetColumnId === 'col_aprovacao' ? 85 : project.progress)
     };
+    await persistConfirmed(upsertProjectAggregate(authUserId || '', updatedProject), 'A movimentação do projeto não foi confirmada.');
     setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
-    persist(upsertProjectAggregate(authUserId || '', updatedProject), 'A movimentação do projeto foi feita localmente, mas não foi confirmada pela nuvem.');
 
     addTimelineEvent(
       user.name,
@@ -782,14 +743,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('info', 'Status Atualizado no Kanban', `Projeto movido para ${targetCol.title}.`);
   };
 
-  const deleteProject = (id: string) => {
+  const deleteProject = async (id: string) => {
     if (denyAction('manage:projects')) return;
+    await persistConfirmed(entityRepository.project.delete(authUserId || '', id), 'O projeto não pôde ser excluído.');
     setProjects(prev => prev.filter(p => p.id !== id));
-    persist(entityRepository.project.delete(authUserId || '', id), 'O projeto foi removido da tela, mas a nuvem não confirmou a exclusão.');
     addToast('warning', 'Projeto Removido', 'O projeto foi removido do Kanban.');
   };
 
-  const submitProjectFeedback = (
+  const submitProjectFeedback = async (
     projectId: string,
     deliverableId: string,
     status: 'aprovado' | 'alteracoes_solicitadas',
@@ -808,8 +769,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reviewedBy: `${user.name} (Aprovação Registrada)`
       } : d)
     };
+    await persistConfirmed(upsertProjectAggregate(authUserId || '', updatedProject), 'O feedback não pôde ser salvo.');
     setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
-    persist(upsertProjectAggregate(authUserId || '', updatedProject), 'O feedback foi salvo localmente, mas a nuvem não confirmou a alteração.');
 
     addTimelineEvent(
       user.name,
@@ -827,29 +788,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Task CRUD
-  const addTask = (taskData: Omit<Task, 'id' | 'createdAt'>): Task => {
+  const addTask = async (taskData: Omit<Task, 'id' | 'createdAt'>): Promise<Task> => {
     if (denyAction('manage:tasks')) throw new Error('Permissão insuficiente');
     const newTask: Task = {
       ...taskData,
-      id: 'task_' + Date.now(),
+      id: `task_${crypto.randomUUID()}`,
       createdAt: new Date().toISOString()
     };
+    await persistConfirmed(entityRepository.task.upsert(authUserId || '', newTask), 'A tarefa não pôde ser salva na nuvem.');
     setTasks(prev => [newTask, ...prev]);
-    persist(entityRepository.task.upsert(authUserId || '', newTask), 'A tarefa foi criada localmente, mas não pôde ser salva na nuvem.');
     addTimelineEvent(user.name, 'criou uma tarefa', `Tarefa "${newTask.title}" atribuída a ${newTask.assignedTo}.`, 'tarefa', newTask.id);
     addToast('success', 'Tarefa Adicionada', `"${newTask.title}" foi criada.`);
     return newTask;
   };
 
-  const toggleTaskCompleted = (taskId: string) => {
+  const toggleTaskCompleted = async (taskId: string) => {
     if (denyAction('manage:tasks')) return;
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     const isNowCompleted = !task.completed;
 
     const updatedTask: Task = { ...task, completed: isNowCompleted, completedAt: isNowCompleted ? new Date().toISOString() : undefined };
+    await persistConfirmed(entityRepository.task.upsert(authUserId || '', updatedTask), 'O status da tarefa não pôde ser atualizado.');
     setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-    persist(entityRepository.task.upsert(authUserId || '', updatedTask), 'O status da tarefa mudou localmente, mas a nuvem não confirmou a alteração.');
 
     if (isNowCompleted) {
       addTimelineEvent(user.name, 'concluiu a tarefa', `Tarefa "${task.title}" marcada como finalizada.`, 'tarefa', task.id);
@@ -857,54 +818,54 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const deleteTask = (taskId: string) => {
+  const deleteTask = async (taskId: string) => {
     if (denyAction('manage:tasks')) return;
+    await persistConfirmed(entityRepository.task.delete(authUserId || '', taskId), 'A tarefa não pôde ser excluída.');
     setTasks(prev => prev.filter(t => t.id !== taskId));
-    persist(entityRepository.task.delete(authUserId || '', taskId), 'A tarefa foi removida da tela, mas a nuvem não confirmou a exclusão.');
     addToast('warning', 'Tarefa Excluída', 'A tarefa foi removida.');
   };
 
   // Kanban Columns
-  const addKanbanColumn = (title: string, color: string = '#66acd7') => {
+  const addKanbanColumn = async (title: string, color: string = '#66acd7') => {
     if (denyAction('manage:kanban')) return;
     const newCol: KanbanColumn = {
-      id: 'col_' + Date.now(),
+      id: `col_${crypto.randomUUID()}`,
       title: title.toUpperCase(),
       color,
       order: kanbanColumns.length
     };
+    await persistConfirmed(entityRepository.column.upsert(authUserId || '', newCol), 'A coluna não pôde ser salva.');
     setKanbanColumns(prev => [...prev, newCol]);
-    persist(entityRepository.column.upsert(authUserId || '', newCol), 'A coluna foi criada localmente, mas não pôde ser salva na nuvem.');
     addToast('success', 'Coluna Adicionada', `Nova coluna "${newCol.title}" criada no Kanban.`);
   };
 
-  const updateKanbanColumn = (id: string, title: string, color?: string) => {
+  const updateKanbanColumn = async (id: string, title: string, color?: string) => {
     if (denyAction('manage:kanban')) return;
     const current = kanbanColumns.find(c => c.id === id);
     if (!current) return;
     const next = { ...current, title: title.toUpperCase(), ...(color ? { color } : {}) };
+    await persistConfirmed(entityRepository.column.upsert(authUserId || '', next), 'A coluna não pôde ser atualizada.');
     setKanbanColumns(prev => prev.map(c => c.id === id ? next : c));
-    persist(entityRepository.column.upsert(authUserId || '', next), 'A coluna foi atualizada localmente, mas a nuvem não confirmou a alteração.');
     addToast('info', 'Coluna Atualizada', 'Coluna renomeada.');
   };
 
-  const deleteKanbanColumn = (id: string) => {
+  const deleteKanbanColumn = async (id: string) => {
     if (denyAction('manage:kanban')) return;
     if (kanbanColumns.length <= 3) {
       addToast('error', 'Ação Bloqueada', 'O Kanban precisa de pelo menos 3 colunas para manter o fluxo.');
       return;
     }
+    await persistConfirmed(entityRepository.column.delete(authUserId || '', id), 'A coluna não pôde ser excluída.');
     setKanbanColumns(prev => prev.filter(c => c.id !== id));
-    persist(entityRepository.column.delete(authUserId || '', id), 'A coluna foi removida da tela, mas a nuvem não confirmou a exclusão.');
     addToast('warning', 'Coluna Removida', 'A coluna foi excluída.');
   };
 
   // Messages & Communications
-  const sendMessage = (clientId: string, content: string, projectId?: string, mediaType: Message['mediaType'] = 'text') => {
+  const sendMessage = async (clientId: string, content: string, projectId?: string, mediaType: Message['mediaType'] = 'text') => {
     if (denyAction('manage:communication')) return;
     const now = new Date();
     const newMsg: Message = {
-      id: 'msg_' + Date.now(),
+      id: `msg_${crypto.randomUUID()}`,
       sender: 'user',
       senderName: user.name,
       content,
@@ -913,8 +874,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       projectId,
       mediaType
     };
+    await persistConfirmed(entityRepository.message.upsert(authUserId || '', newMsg), 'A mensagem não pôde ser salva.');
     setMessages(prev => [...prev, newMsg]);
-    persist(entityRepository.message.upsert(authUserId || '', newMsg), 'A mensagem foi criada localmente, mas não pôde ser salva na nuvem.');
     addTimelineEvent(
       user.name,
       'enviou mensagem contextual',
@@ -925,16 +886,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', 'Mensagem Enviada', 'Registrada no histórico contextual do cliente.');
   };
 
-  const addCommunication = (commData: Omit<Communication, 'id' | 'timestamp'>) => {
+  const addCommunication = async (commData: Omit<Communication, 'id' | 'timestamp'>) => {
     if (denyAction('manage:communication')) return;
     const now = new Date();
     const newComm: Communication = {
       ...commData,
-      id: 'comm_' + Date.now(),
+      id: `comm_${crypto.randomUUID()}`,
       timestamp: now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
     };
+    await persistConfirmed(entityRepository.communication.upsert(authUserId || '', newComm), 'A comunicação não pôde ser registrada.');
     setCommunications(prev => [...prev, newComm]);
-    persist(entityRepository.communication.upsert(authUserId || '', newComm), 'A comunicação foi registrada localmente, mas não pôde ser salva na nuvem.');
     addTimelineEvent(
       commData.sender || user.name,
       `registrou comunicação via ${commData.channel}`,
@@ -945,7 +906,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('success', 'Comunicação Registrada', 'Histórico atualizado com sucesso.');
   };
 
-  const updateProjectApproval = (
+  const updateProjectApproval = async (
     projectId: string,
     status: 'pendente' | 'aprovado' | 'ajustes_solicitados',
     comments: ApprovalComment[]
@@ -963,8 +924,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       comments: []
     };
     const updatedProject: Project = { ...project, mediaApproval: { ...currentApproval, status, comments } };
+    await persistConfirmed(upsertProjectAggregate(authUserId || '', updatedProject), 'A aprovação de mídia não pôde ser atualizada.');
     setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
-    persist(upsertProjectAggregate(authUserId || '', updatedProject), 'A aprovação de mídia foi atualizada localmente, mas a nuvem não confirmou a alteração.');
 
     addTimelineEvent(
       user.name,
@@ -984,20 +945,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!project) throw new Error('Projeto não encontrado.');
     const current = project.mediaApproval || { id: 'med_' + projectId, title: `${project.title} — Aprovação`, version: 'V1', status: 'pendente' as const, comments: [] };
     const updated = { ...project, mediaApproval: { ...current, [kind === 'video' ? 'videoUrl' : 'thumbnailUrl']: reference } };
-    setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
     await updateMediaApprovalAsset(authUserId, projectId, { id: updated.mediaApproval?.id, title: updated.mediaApproval?.title, version: updated.mediaApproval?.version, status: updated.mediaApproval?.status, videoUrl: updated.mediaApproval?.videoUrl, thumbnailUrl: updated.mediaApproval?.thumbnailUrl });
+    setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
   };
 
   // Calendar Actions
-  const addCalendarEvent = (eventData: Omit<CalendarEvent, 'id' | 'createdAt'>) => {
+  const addCalendarEvent = async (eventData: Omit<CalendarEvent, 'id' | 'createdAt'>) => {
     if (denyAction('manage:calendar')) throw new Error('Permissão insuficiente');
     const newEvent: CalendarEvent = {
       ...eventData,
-      id: 'evt_cal_' + Date.now(),
+      id: `evt_cal_${crypto.randomUUID()}`,
       createdAt: new Date().toISOString()
     };
+    await persistConfirmed(entityRepository.calendar.upsert(authUserId || '', newEvent), 'O evento não pôde ser salvo.');
     setCalendarEvents(prev => [...prev, newEvent]);
-    persist(entityRepository.calendar.upsert(authUserId || '', newEvent), 'O evento foi criado localmente, mas não pôde ser salvo na nuvem.');
     addTimelineEvent(
       user.name,
       'agendou novo compromisso',
@@ -1009,44 +970,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newEvent;
   };
 
-  const updateCalendarEvent = (id: string, updates: Partial<CalendarEvent>) => {
+  const updateCalendarEvent = async (id: string, updates: Partial<CalendarEvent>) => {
     if (denyAction('manage:calendar')) return;
     const current = calendarEvents.find(e => e.id === id);
     if (!current) return;
     const next = { ...current, ...updates };
+    await persistConfirmed(entityRepository.calendar.upsert(authUserId || '', next), 'O evento não pôde ser atualizado.');
     setCalendarEvents(prev => prev.map(e => e.id === id ? next : e));
-    persist(entityRepository.calendar.upsert(authUserId || '', next), 'O evento foi atualizado localmente, mas a nuvem não confirmou a alteração.');
     addToast('success', 'Evento Atualizado', 'As alterações na agenda foram salvas.');
   };
 
-  const deleteCalendarEvent = (id: string) => {
+  const deleteCalendarEvent = async (id: string) => {
     if (denyAction('manage:calendar')) return;
+    await persistConfirmed(entityRepository.calendar.delete(authUserId || '', id), 'O evento não pôde ser excluído.');
     setCalendarEvents(prev => prev.filter(e => e.id !== id));
-    persist(entityRepository.calendar.delete(authUserId || '', id), 'O evento foi removido da tela, mas a nuvem não confirmou a exclusão.');
     addToast('info', 'Evento Removido', 'O compromisso foi excluído da agenda.');
   };
 
-  const toggleCalendarEventStatus = (id: string, status: CalendarEventStatus) => {
+  const toggleCalendarEventStatus = async (id: string, status: CalendarEventStatus) => {
     if (denyAction('manage:calendar')) return;
     const current = calendarEvents.find(e => e.id === id);
     if (!current) return;
     const next = { ...current, status };
+    await persistConfirmed(entityRepository.calendar.upsert(authUserId || '', next), 'O status do evento não pôde ser atualizado.');
     setCalendarEvents(prev => prev.map(e => e.id === id ? next : e));
-    persist(entityRepository.calendar.upsert(authUserId || '', next), 'O status do evento mudou localmente, mas a nuvem não confirmou a alteração.');
     const label = status === 'completed' ? 'Concluído' : status === 'cancelled' ? 'Cancelado' : 'Agendado';
     addToast('success', 'Status da Agenda', `Evento marcado como ${label}.`);
   };
 
   // Approval Requests Actions
-  const addApprovalRequest = (reqData: Omit<ApprovalRequest, 'id' | 'createdAt'>) => {
+  const addApprovalRequest = async (reqData: Omit<ApprovalRequest, 'id' | 'createdAt'>) => {
     if (denyAction('manage:approvals')) throw new Error('Permissão insuficiente');
     const newReq: ApprovalRequest = {
       ...reqData,
-      id: 'appr_' + Date.now(),
+      id: `appr_${crypto.randomUUID()}`,
       createdAt: new Date().toISOString().split('T')[0]
     };
+    await persistConfirmed(entityRepository.approval.upsert(authUserId || '', newReq), 'A solicitação não pôde ser salva.');
     setApprovalRequests(prev => [newReq, ...prev]);
-    persist(entityRepository.approval.upsert(authUserId || '', newReq), 'A solicitação foi criada localmente, mas não pôde ser salva na nuvem.');
     addTimelineEvent(
       user.name,
       'abriu nova solicitação de aprovação',
@@ -1058,24 +1019,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newReq;
   };
 
-  const updateApprovalRequest = (id: string, updates: Partial<ApprovalRequest>) => {
+  const updateApprovalRequest = async (id: string, updates: Partial<ApprovalRequest>) => {
     if (denyAction('manage:approvals')) return;
     const current = approvalRequests.find(r => r.id === id);
     if (!current) return;
     const next = { ...current, ...updates };
+    await persistConfirmed(entityRepository.approval.upsert(authUserId || '', next), 'A aprovação não pôde ser atualizada.');
     setApprovalRequests(prev => prev.map(r => r.id === id ? next : r));
-    persist(entityRepository.approval.upsert(authUserId || '', next), 'A aprovação foi atualizada localmente, mas a nuvem não confirmou a alteração.');
     addToast('success', 'Aprovação Atualizada', 'As alterações foram salvas.');
   };
 
-  const deleteApprovalRequest = (id: string) => {
+  const deleteApprovalRequest = async (id: string) => {
     if (denyAction('manage:approvals')) return;
+    await persistConfirmed(entityRepository.approval.delete(authUserId || '', id), 'A solicitação não pôde ser excluída.');
     setApprovalRequests(prev => prev.filter(r => r.id !== id));
-    persist(entityRepository.approval.delete(authUserId || '', id), 'A solicitação foi removida da tela, mas a nuvem não confirmou a exclusão.');
     addToast('info', 'Solicitação Removida', 'O item de aprovação foi excluído.');
   };
 
-  const updateApprovalStatus = (
+  const updateApprovalStatus = async (
     id: string,
     status: ApprovalStatus,
     notes?: string,
@@ -1094,8 +1055,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       rejectionReason: status === 'rejected' ? (notes || currentRequest.rejectionReason) : currentRequest.rejectionReason,
       revisionNotes: status === 'needs_revision' ? (notes || currentRequest.revisionNotes) : currentRequest.revisionNotes
     };
+    await persistConfirmed(entityRepository.approval.upsert(authUserId || '', updatedRequest), 'O status da aprovação não pôde ser atualizado.');
     setApprovalRequests(prev => prev.map(r => r.id === id ? updatedRequest : r));
-    persist(entityRepository.approval.upsert(authUserId || '', updatedRequest), 'O status da aprovação mudou localmente, mas a nuvem não confirmou a alteração.');
 
     const statusLabels: Record<ApprovalStatus, string> = {
       pending: 'Pendente',
@@ -1121,16 +1082,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Team
-  const addTeamMember = (memberData: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => {
+  const addTeamMember = async (memberData: Omit<TeamMember, 'id' | 'projectsCount' | 'status'>) => {
     if (denyAction('manage:team')) return;
     const newMember: TeamMember = {
       ...memberData,
-      id: 'tm_' + Date.now(),
+      id: `tm_${crypto.randomUUID()}`,
       projectsCount: 0,
       status: 'ativo'
     };
+    await persistConfirmed(entityRepository.team.upsert(authUserId || '', newMember), 'O membro não pôde ser salvo.');
     setTeam(prev => [...prev, newMember]);
-    persist(entityRepository.team.upsert(authUserId || '', newMember), 'O membro foi criado localmente, mas não pôde ser salvo na nuvem.');
     addToast('success', 'Membro Adicionado', `${newMember.name} foi adicionado à equipe com sucesso.`);
   };
 
@@ -1156,14 +1117,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Integrations
-  const toggleIntegration = (id: string) => {
+  const toggleIntegration = async (id: string) => {
     if (denyAction('manage:integrations')) return;
     const current = integrations.find(i => i.id === id);
     if (!current) return;
     const nextStatus = current.status === 'conectado' ? 'configuravel' : 'conectado';
     const next = { ...current, status: nextStatus as IntegrationItem['status'], connectedAt: nextStatus === 'conectado' ? new Date().toISOString() : current.connectedAt };
+    await persistConfirmed(entityRepository.integration.upsert(authUserId || '', next), 'A integração não pôde ser atualizada.');
     setIntegrations(prev => prev.map(i => i.id === id ? next : i));
-    persist(entityRepository.integration.upsert(authUserId || '', next), 'A integração mudou localmente, mas a nuvem não confirmou a alteração.');
     addToast(
       nextStatus === 'conectado' ? 'success' : 'info',
       current.name,
@@ -1240,6 +1201,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isSupabaseConfigured,
         isAuthenticated: Boolean(authUserId),
         authReady,
+        workspaceStatus,
+        workspaceError,
+        retryWorkspaceLoad,
         signIn,
         signUp,
         signOut,

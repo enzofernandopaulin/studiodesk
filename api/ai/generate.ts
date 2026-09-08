@@ -1,12 +1,12 @@
 import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, serverError } from '../_lib/http.js';
+import { json, methodNotAllowed, sendWebResponse, serverError, toWebRequest } from '../_lib/http.js';
 import { rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
 
 const MAX_PROMPT = 12000;
 
 type Body = { prompt?: unknown; system?: unknown; temperature?: unknown; maxOutputTokens?: unknown };
 
-export default async function handler(request: Request): Promise<Response> {
+async function webHandler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed(['POST']);
   const limited = rateLimit(request, 20);
   if (limited) return limited;
@@ -62,4 +62,8 @@ export default async function handler(request: Request): Promise<Response> {
     console.error('POST /api/ai/generate failed', error);
     return serverError();
   }
+}
+
+export default async function handler(request: any, response: any) {
+  return sendWebResponse(await webHandler(toWebRequest(request)), response);
 }

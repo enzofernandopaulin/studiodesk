@@ -1,5 +1,5 @@
 import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, serverError } from '../_lib/http.js';
+import { json, methodNotAllowed, sendWebResponse, serverError, toWebRequest } from '../_lib/http.js';
 import { rateLimit, readJson } from '../_lib/security.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 
@@ -7,7 +7,7 @@ type Body = { workspaceId?: unknown; name?: unknown; email?: unknown; phone?: un
 const text = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 function safeEqual(a: string, b: string) { const aa = createHash('sha256').update(a).digest(); const bb = createHash('sha256').update(b).digest(); return timingSafeEqual(aa, bb); }
 
-export default async function handler(request: Request): Promise<Response> {
+async function webHandler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed(['POST']);
   const limited = rateLimit(request, 30); if (limited) return limited;
   try {
@@ -31,4 +31,8 @@ export default async function handler(request: Request): Promise<Response> {
     if (message.includes('Corpo da solicitação') || error instanceof SyntaxError) return json({ error: 'JSON inválido.' }, 400);
     console.error('POST /api/webhooks/leads failed', error); return serverError();
   }
+}
+
+export default async function handler(request: any, response: any) {
+  return sendWebResponse(await webHandler(toWebRequest(request)), response);
 }

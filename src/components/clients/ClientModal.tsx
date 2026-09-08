@@ -39,10 +39,11 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
     setTags(prev => prev.filter(t => t !== tagToRemove));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (clientToEdit) {
-      updateClient(clientToEdit.id, {
+    try {
+      if (clientToEdit) {
+        await updateClient(clientToEdit.id, {
         name,
         company,
         email,
@@ -55,9 +56,9 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
         status,
         notes,
         tags
-      });
-    } else {
-      addClient({
+        });
+      } else {
+        await addClient({
         name,
         company,
         email,
@@ -70,9 +71,12 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
         status,
         notes,
         tags
-      });
+        });
+      }
+      onClose();
+    } catch {
+      // O formulário permanece aberto quando o banco recusa a alteração.
     }
-    onClose();
   };
 
   return (

@@ -30,13 +30,14 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const selectedClient = clients.find(c => c.id === clientId);
     const clientName = selectedClient ? selectedClient.company : 'Cliente';
 
-    if (projectToEdit) {
-      updateProject(projectToEdit.id, {
+    try {
+      if (projectToEdit) {
+        await updateProject(projectToEdit.id, {
         title,
         clientId,
         clientName,
@@ -47,9 +48,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         budget: Number(budget) || 0,
         description,
         tags
-      });
-    } else {
-      addProject({
+        });
+      } else {
+        await addProject({
         title,
         clientId,
         clientName,
@@ -60,9 +61,12 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
         budget: Number(budget) || 0,
         description,
         tags
-      });
+        });
+      }
+      onClose();
+    } catch {
+      // O formulário permanece aberto quando a persistência falha.
     }
-    onClose();
   };
 
   return (

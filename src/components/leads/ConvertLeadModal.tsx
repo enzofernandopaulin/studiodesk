@@ -15,18 +15,26 @@ export const ConvertLeadModal: React.FC<ConvertLeadModalProps> = ({ isOpen, onCl
   const [projectTitle, setProjectTitle] = useState(
     lead ? `Projeto Inicial — ${lead.company}` : 'Projeto Inicial'
   );
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen || !lead) return null;
 
-  const handleConvert = (e: React.FormEvent) => {
+  const handleConvert = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = convertLeadToClient(lead.id, createProject, projectTitle);
-    setSelectedClientId(result.client.id);
-    if (result.project) {
-      setSelectedProjectId(result.project.id);
+    setSubmitting(true);
+    setError('');
+    try {
+      const result = await convertLeadToClient(lead.id, createProject, projectTitle);
+      setSelectedClientId(result.client.id);
+      if (result.project) setSelectedProjectId(result.project.id);
+      onClose();
+      setCurrentView(createProject ? 'kanban' : 'clients');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Não foi possível concluir a conversão.');
+    } finally {
+      setSubmitting(false);
     }
-    onClose();
-    setCurrentView(createProject ? 'kanban' : 'clients');
   };
 
   return (
@@ -86,20 +94,23 @@ export const ConvertLeadModal: React.FC<ConvertLeadModalProps> = ({ isOpen, onCl
             )}
           </div>
 
+          {error ? <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">{error}</p> : null}
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#DDE3E8]">
             <button
               type="button"
               onClick={onClose}
+              disabled={submitting}
               className="px-4 py-2 text-xs font-semibold text-[#6B7280] hover:text-[#111111]"
             >
               Cancelar
             </button>
             <button
               type="submit"
+              disabled={submitting}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-colors shadow-xs flex items-center gap-1.5"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Confirmar Conversão</span>
+              <span>{submitting ? 'Convertendo...' : 'Confirmar Conversão'}</span>
             </button>
           </div>
         </form>

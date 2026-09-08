@@ -34,19 +34,17 @@ export default async function handler(request: any, response: any) {
     if (request.method === 'POST') {
       const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
       if (!name) return response.status(400).json({ error: 'Informe o nome do novo workspace.' });
-      const { data: workspace, error } = await admin.from('workspaces').insert({ name, owner_id: user.id, plan: 'individual' }).select('id,name,plan').single();
+      const { data: workspace, error } = await admin.rpc('create_workspace_for_user', { p_user_id: user.id, p_name: name });
       if (error) throw error;
-      const { error: membershipError } = await admin.from('workspace_members').insert({ workspace_id: workspace.id, user_id: user.id, role: 'admin' });
-      if (membershipError) throw membershipError;
-      await admin.from('profiles').update({ workspace_id: workspace.id, company_name: name, role: 'admin', updated_at: new Date().toISOString() }).eq('id', user.id);
-      return response.status(201).json({ workspace: { ...workspace, role: 'admin' } });
+      return response.status(201).json({ workspace: { ...(workspace as object), role: 'admin' } });
     }
 
     if (request.method === 'PATCH') {
       const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId : '';
       const { data: membership } = await admin.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', user.id).maybeSingle();
       if (!membership) return response.status(403).json({ error: 'Você não pertence a esse workspace.' });
-      const { data: workspace } = await admin.from('workspaces').select('name').eq('id', workspaceId).single();
+      const { data: workspace, error: workspaceError } = await admin.from('workspaces').select('name').eq('id', workspaceId).single();
+      if (workspaceError || !workspace) throw workspaceError || new Error('Workspace não encontrado.');
       const { error } = await admin.from('profiles').update({ workspace_id: workspaceId, company_name: workspace.name, role: membership.role, updated_at: new Date().toISOString() }).eq('id', user.id);
       if (error) throw error;
       return response.status(200).json({ selected: true });
@@ -56,6 +54,10 @@ export default async function handler(request: any, response: any) {
     return response.status(405).json({ error: 'Método não permitido.' });
   } catch (error) {
     console.error('/api/workspaces failed', error);
+    const message = error instanceof Error ? error.message : '';
+    if (/create_workspace_for_user|schema cache|function .* does not exist/i.test(message)) {
+      return response.status(503).json({ error: 'Execute supabase/FASE-1-INTEGRIDADE.sql no Supabase.' });
+    }
     return response.status(500).json({ error: 'Não foi possível gerenciar seus workspaces.' });
   }
 }

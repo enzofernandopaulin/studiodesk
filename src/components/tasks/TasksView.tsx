@@ -42,18 +42,16 @@ export const TasksView: React.FC = () => {
     });
   }, [tasks, activeFilter, searchQuery, user.name]);
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
-    addTask({
-      title: newTitle.trim(),
-      projectId: newProjectId,
-      assignedTo: newAssignedTo,
-      dueDate: newDueDate,
-      completed: false,
-      priority: newPriority
-    });
-    setNewTitle('');
+    try {
+      await addTask({
+        title: newTitle.trim(), projectId: newProjectId, assignedTo: newAssignedTo,
+        dueDate: newDueDate, completed: false, priority: newPriority
+      });
+      setNewTitle('');
+    } catch { /* O contexto exibe o erro e mantém os dados digitados. */ }
   };
 
   const completedCount = tasks.filter(t => t.completed).length;

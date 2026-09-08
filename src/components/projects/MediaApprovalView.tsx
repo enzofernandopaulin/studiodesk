@@ -58,7 +58,7 @@ export const MediaApprovalView: React.FC<MediaApprovalProps> = ({ project }) => 
     if (!newComment.trim()) return;
 
     const newCommentObj: ApprovalComment = {
-      id: `comm_${Date.now()}`,
+      id: `comm_${crypto.randomUUID()}`,
       author: user.name,
       role: 'equipe',
       timecode: commentTime,

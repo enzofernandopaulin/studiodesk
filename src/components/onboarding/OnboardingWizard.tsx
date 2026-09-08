@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { saveProfile } from '../../lib/workspaceRepository';
+import { completeOnboarding } from '../../lib/workspaceRepository';
 import { Logo } from '../common/Logo';
 import { 
   ArrowRight, 
@@ -134,11 +134,12 @@ export const OnboardingWizard: React.FC = () => {
       template
     };
 
+    const selectedTpl = templates.find(t => t.id === template);
+    const selectedColumns = selectedTpl?.columns || [];
     setIsFinishing(true);
     try {
-      // Persiste antes de liberar a escolha do convite. Assim o onboarding
-      // não volta a aparecer caso o usuário troque de workspace ou recarregue.
-      await saveProfile(completedUser);
+      // Perfil e Kanban são confirmados na mesma transação do Supabase.
+      await completeOnboarding(completedUser, selectedColumns);
     } catch (error) {
       setIsFinishing(false);
       addToast('error', 'Configuração não salva', error instanceof Error ? error.message : 'Tente novamente.');
@@ -148,10 +149,7 @@ export const OnboardingWizard: React.FC = () => {
     setUser(completedUser);
 
     // 2. Set selected Kanban columns template
-    const selectedTpl = templates.find(t => t.id === template);
-    if (selectedTpl && selectedTpl.columns) {
-      setKanbanColumns(selectedTpl.columns);
-    }
+    if (selectedColumns.length) setKanbanColumns(selectedColumns);
 
     addToast('success', 'StudioDesk Configurado', 'Seu espaço de trabalho foi configurado com sucesso!');
     setCurrentView('first_access');

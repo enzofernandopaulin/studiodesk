@@ -26,10 +26,11 @@ export const LeadModal: React.FC<LeadModalProps> = ({ isOpen, onClose, leadToEdi
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (leadToEdit) {
-      updateLead(leadToEdit.id, {
+    try {
+      if (leadToEdit) {
+        await updateLead(leadToEdit.id, {
         name,
         company,
         email,
@@ -41,9 +42,9 @@ export const LeadModal: React.FC<LeadModalProps> = ({ isOpen, onClose, leadToEdi
         notes,
         status,
         value: Number(value) || 0
-      });
-    } else {
-      addLead({
+        });
+      } else {
+        await addLead({
         name,
         company,
         email,
@@ -55,9 +56,12 @@ export const LeadModal: React.FC<LeadModalProps> = ({ isOpen, onClose, leadToEdi
         notes,
         status,
         value: Number(value) || 0
-      });
+        });
+      }
+      onClose();
+    } catch {
+      // O contexto mantém o formulário aberto e exibe o erro confirmado pelo Supabase.
     }
-    onClose();
   };
 
   return (

@@ -58,7 +58,7 @@ export async function getWorkspaceId(userId: string): Promise<string | null> {
   return data?.workspace_id ?? null;
 }
 
-export async function loadWorkspace(userId: string): Promise<Partial<WorkspaceState> | null> {
+export async function loadWorkspace(userId: string): Promise<WorkspaceState | null> {
   if (!supabase) return null;
   const workspaceId = await getWorkspaceId(userId);
   if (!workspaceId) return null;
@@ -85,9 +85,6 @@ export async function loadWorkspace(userId: string): Promise<Partial<WorkspaceSt
   const failed = result.find(r => r.error);
   if (failed?.error) throw failed.error;
 
-  const hasData = result.some(r => (r.data ?? []).length > 0);
-  if (!hasData) return null;
-
   const projectRows = projects.data ?? [];
   const clientNames = new Map((clients.data ?? []).map(c => [c.id, c.company || c.name]));
   const mediaByProject = new Map((media.data ?? []).map(m => [m.project_id, m]));
@@ -107,6 +104,27 @@ export async function loadWorkspace(userId: string): Promise<Partial<WorkspaceSt
     team: (team.data ?? []).map(r => ({ id:r.id,name:r.name,email:r.email,role:r.role,accessLevel:r.access_level,avatar:r.avatar,projectsCount:r.projects_count,status:r.status })),
     integrations: (integrations.data ?? []).map(r => ({ id:r.id,name:r.name,category:r.category,description:r.description,status:r.status,connectedAt:clean(r.connected_at),iconName:r.icon_name,details:clean(r.details) })),
   };
+}
+
+export async function completeOnboarding(user: UserProfile, columns: KanbanColumn[]): Promise<void> {
+  if (!supabase) throw new Error('Supabase não está configurado.');
+  if (!user.id) throw new Error('Usuário autenticado não encontrado.');
+  const { error } = await supabase.rpc('complete_studiodesk_onboarding', {
+    p_name: user.name,
+    p_avatar: user.avatar,
+    p_plan: user.plan,
+    p_business_type: user.businessType,
+    p_team_size: user.teamSize,
+    p_objectives: user.objectives,
+    p_template: user.template,
+    p_columns: columns.map(column => ({
+      id: column.id,
+      title: column.title,
+      color: column.color,
+      order: column.order,
+    })),
+  });
+  if (error) throw error;
 }
 
 export async function loadProfile(userId: string): Promise<Partial<UserProfile> | null> {

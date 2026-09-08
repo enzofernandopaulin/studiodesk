@@ -1,5 +1,5 @@
 import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, serverError } from '../_lib/http.js';
+import { json, methodNotAllowed, sendWebResponse, serverError, toWebRequest } from '../_lib/http.js';
 import { isSafeStoragePath, rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
 
 const DEFAULT_EXPIRATION = 3600;
@@ -8,7 +8,7 @@ const BUCKET = 'studiodesk-files';
 
 type Body = { path?: unknown; expiresIn?: unknown };
 
-export default async function handler(request: Request): Promise<Response> {
+async function webHandler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed(['POST']);
 
   const limited = rateLimit(request, 30);
@@ -55,4 +55,8 @@ export default async function handler(request: Request): Promise<Response> {
     console.error('POST /api/storage/signed-url unexpected failure', error);
     return serverError();
   }
+}
+
+export default async function handler(request: any, response: any) {
+  return sendWebResponse(await webHandler(toWebRequest(request)), response);
 }

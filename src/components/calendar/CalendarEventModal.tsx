@@ -91,14 +91,15 @@ export const CalendarEventModal: React.FC<CalendarEventModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     const assignedMember = team.find(m => m.name === assignedTo);
 
-    if (eventToEdit) {
-      updateCalendarEvent(eventToEdit.id, {
+    try {
+      if (eventToEdit) {
+        await updateCalendarEvent(eventToEdit.id, {
         title: title.trim(),
         description: description.trim(),
         date,
@@ -112,9 +113,9 @@ export const CalendarEventModal: React.FC<CalendarEventModalProps> = ({
         status,
         locationOrLink: locationOrLink.trim() || undefined,
         notes: notes.trim() || undefined
-      });
-    } else {
-      addCalendarEvent({
+        });
+      } else {
+        await addCalendarEvent({
         title: title.trim(),
         description: description.trim(),
         date,
@@ -128,10 +129,12 @@ export const CalendarEventModal: React.FC<CalendarEventModalProps> = ({
         status,
         locationOrLink: locationOrLink.trim() || undefined,
         notes: notes.trim() || undefined
-      });
+        });
+      }
+      onClose();
+    } catch {
+      // Mantém o formulário aberto em caso de erro.
     }
-
-    onClose();
   };
 
   const eventTypeOptions: Array<{ id: CalendarEventType; label: string; icon: React.ElementType; color: string }> = [

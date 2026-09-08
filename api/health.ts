@@ -1,7 +1,7 @@
-import { json, methodNotAllowed } from './_lib/http.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from './_lib/http.js';
 import { rateLimit } from './_lib/security.js';
 
-export default async function handler(request: Request): Promise<Response> {
+async function webHandler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return methodNotAllowed(['GET']);
   const limited = rateLimit(request, 30);
   if (limited) return limited;
@@ -12,4 +12,8 @@ export default async function handler(request: Request): Promise<Response> {
     serverless: true,
     timestamp: new Date().toISOString(),
   });
+}
+
+export default async function handler(request: any, response: any) {
+  return sendWebResponse(await webHandler(toWebRequest(request)), response);
 }

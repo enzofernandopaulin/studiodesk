@@ -16,6 +16,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { PLANS_LIST, getPlanDetails, PlanType } from '../../data/plans';
+import { saveProfile } from '../../lib/workspaceRepository';
 
 export const SettingsView: React.FC = () => {
   const { 
@@ -30,18 +31,28 @@ export const SettingsView: React.FC = () => {
   const userEmail = user.email;
   const [companyName, setCompanyName] = useState(user.companyName);
   const [template, setTemplate] = useState(user.template || 'Audiovisual');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
 
   const currentPlanDetails = getPlanDetails(user.plan);
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser(prev => ({
-      ...prev,
+    const updated = {
+      ...user,
       name: userName,
       companyName,
       template
-    }));
-    addToast('success', 'Configurações Salvas', 'Perfil e dados da empresa atualizados com sucesso.');
+    };
+    setIsSavingProfile(true);
+    try {
+      await saveProfile(updated);
+      setUser(updated);
+      addToast('success', 'Configurações salvas', 'O Supabase confirmou as alterações do perfil.');
+    } catch (error) {
+      addToast('error', 'Configurações não salvas', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
 
@@ -106,9 +117,10 @@ export const SettingsView: React.FC = () => {
               <div className="flex justify-end">
                 <button
                   type="submit"
+                  disabled={isSavingProfile}
                   className="bg-[#111111] hover:bg-[#2F6F9C] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-colors shadow-xs"
                 >
-                  Salvar Alterações
+                  {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
             </form>

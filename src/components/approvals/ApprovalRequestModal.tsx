@@ -124,7 +124,7 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
     }
 
     if (requestToEdit) {
-      updateApprovalRequest(requestToEdit.id, {
+      await updateApprovalRequest(requestToEdit.id, {
         title: title.trim(),
         description: description.trim(),
         clientId,
@@ -141,7 +141,7 @@ export const ApprovalRequestModal: React.FC<ApprovalRequestModalProps> = ({
         status
       });
     } else {
-      addApprovalRequest({
+      await addApprovalRequest({
         title: title.trim(),
         description: description.trim(),
         clientId,

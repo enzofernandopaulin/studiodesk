@@ -11,7 +11,7 @@ export default async function handler(request: any, response: any) {
     if (authError || !auth.user) return response.status(401).json({ error: 'Sessão inválida.' });
 
     const { data: profile, error: profileError } = await admin.from('profiles')
-      .select('id,workspace_id,plan').eq('id', auth.user.id).maybeSingle();
+      .select('id,workspace_id,plan,name,email,company_name,role').eq('id', auth.user.id).maybeSingle();
     if (profileError) throw profileError;
 
     const { data: memberships, error: membershipsError } = await admin.from('workspace_members')
@@ -42,18 +42,26 @@ export default async function handler(request: any, response: any) {
       .select('name').eq('id', active.workspace_id).single();
     if (workspaceError) throw workspaceError;
 
-    const identity = {
-      id: auth.user.id,
-      workspace_id: active.workspace_id,
-      name: String(auth.user.user_metadata?.name || profile?.id && auth.user.email?.split('@')[0] || ''),
-      email: auth.user.email || '',
-      company_name: workspace.name,
-      role: active.role,
-      plan: profile?.plan || 'individual',
-      updated_at: new Date().toISOString(),
-    };
-    const { error: upsertError } = await admin.from('profiles').upsert(identity, { onConflict: 'id' });
-    if (upsertError) throw upsertError;
+    if (!profile) {
+      const { error: insertError } = await admin.from('profiles').insert({
+        id: auth.user.id,
+        workspace_id: active.workspace_id,
+        name: String(auth.user.user_metadata?.name || auth.user.email?.split('@')[0] || ''),
+        email: auth.user.email || '',
+        company_name: workspace.name,
+        role: active.role,
+        plan: 'individual',
+      });
+      if (insertError) throw insertError;
+    } else if (profile.workspace_id !== active.workspace_id || profile.company_name !== workspace.name || profile.role !== active.role) {
+      const { error: updateError } = await admin.from('profiles').update({
+        workspace_id: active.workspace_id,
+        company_name: workspace.name,
+        role: active.role,
+        updated_at: new Date().toISOString(),
+      }).eq('id', auth.user.id);
+      if (updateError) throw updateError;
+    }
 
     return response.status(200).json({ ready: true, workspaceId: active.workspace_id });
   } catch (error) {

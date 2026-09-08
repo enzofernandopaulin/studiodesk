@@ -114,4 +114,20 @@ export async function updateMediaApprovalAsset(userId: string, projectId: string
   if (error) throw error;
 }
 
+export async function convertLeadAtomic(
+  leadId: string,
+  client: Client,
+  project: Project | undefined,
+  event: TimelineEvent,
+): Promise<void> {
+  if (!supabase) throw new Error('Supabase não está configurado.');
+  const { error } = await supabase.rpc('convert_lead_to_client', {
+    p_lead_id: leadId,
+    p_client: clientRow(client),
+    p_project: project ? projectRow(project) : null,
+    p_event: timelineRow(event),
+  });
+  if (error) throw error;
+}
+
 export async function clearWorkspaceCache(userId: string) { workspaceCache.delete(userId); }

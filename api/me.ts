@@ -1,8 +1,8 @@
 import { authenticateRequest, getMembership } from './_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, serverError } from './_lib/http.js';
+import { json, methodNotAllowed, sendWebResponse, serverError, toWebRequest } from './_lib/http.js';
 import { rateLimit } from './_lib/security.js';
 
-export default async function handler(request: Request): Promise<Response> {
+async function webHandler(request: Request): Promise<Response> {
   if (request.method !== 'GET') return methodNotAllowed(['GET']);
   const limited = rateLimit(request, 60);
   if (limited) return limited;
@@ -40,4 +40,8 @@ export default async function handler(request: Request): Promise<Response> {
     console.error('GET /api/me failed', error);
     return serverError();
   }
+}
+
+export default async function handler(request: any, response: any) {
+  return sendWebResponse(await webHandler(toWebRequest(request)), response);
 }
