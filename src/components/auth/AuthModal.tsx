@@ -18,7 +18,7 @@ export const AuthView: React.FC = () => {
     setAuthError('');
 
     if (!isSupabaseConfigured) {
-      setAuthError('Supabase não está configurado. Preencha VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY no .env.local e reinicie o Vite.');
+      setAuthError('Supabase não está disponível neste deploy. Confira as variáveis da Vercel e faça um novo deploy.');
       return;
     }
 
@@ -87,7 +87,7 @@ export const AuthView: React.FC = () => {
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
             <div>
               <strong>Supabase não configurado.</strong><br />
-              Configure o arquivo <code>.env.local</code> e reinicie <code>npm run dev</code>. O acesso local sem autenticação foi removido.
+              A configuração pública do Supabase não foi carregada neste deploy. Confira as variáveis da Vercel e execute um novo deploy.
             </div>
           </div>
         )}
