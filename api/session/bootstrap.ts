@@ -17,7 +17,10 @@ export default async function handler(request: any, response: any) {
       p_company_name:String(metadata.company_name || 'Meu Workspace').trim().slice(0,120),
     });
     if (error) throw error;
-    return response.status(200).json(data);
+    const result=data as {ready:boolean;workspaceId:string};
+    const {data:workspace,error:workspaceError}=await admin.from('workspaces').select('plan').eq('id',result.workspaceId).single();
+    if (workspaceError) throw workspaceError;
+    return response.status(200).json({...result,plan:workspace.plan});
   } catch(error) {
     console.error('POST /api/session/bootstrap failed',error);
     const message=error instanceof Error?error.message:'';

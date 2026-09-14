@@ -159,7 +159,7 @@ type DataModule = 'leads' | 'clients' | 'projects' | 'tasks' | 'calendar' | 'app
 
 const getDataModule = (view: ActiveView): DataModule | null => {
   if (view === 'leads') return 'leads';
-  if (view === 'clients' || view === 'client_profile') return 'clients';
+  if (view === 'clients' || view === 'client_profile' || view === 'client_detail') return 'clients';
   if (view === 'projects' || view === 'kanban' || view === 'project_detail') return 'projects';
   if (view === 'tasks') return 'tasks';
   if (view === 'calendar' || view === 'schedule') return 'calendar';
@@ -273,7 +273,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
-      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string }>('/api/session/bootstrap', { method: 'POST' });
+      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string; plan: PlanType }>('/api/session/bootstrap', { method: 'POST' });
       const [profile, workspace, canonicalTeam, avatarUrl] = await Promise.all([
         loadProfile(userId),
         loadWorkspace(bootstrap.workspaceId),
@@ -295,6 +295,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         id: userId,
         ...profile,
+        plan: bootstrap.plan,
         avatar: avatarUrl ?? '',
       }));
 

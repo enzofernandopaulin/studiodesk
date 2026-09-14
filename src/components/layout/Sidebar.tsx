@@ -43,7 +43,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
   const pendingTasksCount = tasks.filter(t => !t.completed).length;
   const activeLeadsCount = leads.filter(l => l.status !== 'perdido' && l.status !== 'convertido').length;
   const pendingApprovalsCount = (approvalRequests || []).filter(a => a.status === 'pending' || a.status === 'in_review').length;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const todayEventsCount = (calendarEvents || []).filter(e => e.date === todayStr && e.status === 'scheduled').length;
 
   const navigationItems: Array<{
@@ -116,7 +117,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
           </div>
 
           {navigationItems.map(item => {
-            if (item.companyOnly && plan !== 'empresa') {
+            if (item.companyOnly && (plan === 'individual' || plan === 'solo')) {
               return null;
             }
 

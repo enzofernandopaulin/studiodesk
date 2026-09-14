@@ -162,7 +162,7 @@ export const App: React.FC = () => {
               )}
               {currentView === 'leads' && <LeadsView />}
               {currentView === 'clients' && <ClientsView />}
-              {currentView === 'client_profile' && (
+              {(currentView === 'client_profile' || currentView === 'client_detail') && (
                 <ClientProfileView onOpenNewProjectForClient={handleOpenNewProjectForClient} />
               )}
               {currentView === 'kanban' && <KanbanBoardView />}

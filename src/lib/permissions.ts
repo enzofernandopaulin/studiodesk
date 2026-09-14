@@ -25,6 +25,7 @@ export const viewPermission: Partial<Record<ActiveView, Permission>> = {
   leads: 'manage:crm',
   clients: 'manage:crm',
   client_profile: 'manage:crm',
+  client_detail: 'manage:crm',
   kanban: 'manage:kanban',
   projects: 'manage:projects',
   project_detail: 'manage:projects',
