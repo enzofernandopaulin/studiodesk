@@ -27,7 +27,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { loadProfile, loadWorkspace, loadWorkspacePatch } from '../lib/workspaceRepository';
 import type { WorkspaceState } from '../lib/workspaceRepository';
 import { convertLeadAtomic, entityRepository, upsertProjectAggregate, updateMediaApprovalAsset } from '../lib/entityRepository';
-import { loadProfileAvatarUrl, uploadWorkspaceFile } from '../lib/storageRepository';
+import { isStorageReference, loadProfileAvatarUrl, removeWorkspaceFile, uploadWorkspaceFile } from '../lib/storageRepository';
 import { can, Permission } from '../lib/permissions';
 import { subscribeToWorkspaceRealtime, removeRealtimeChannel, RealtimeTable } from '../lib/realtimeRepository';
 import { callServerApi } from '../lib/serverApi';
@@ -1098,8 +1098,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: 'med_' + projectId,
       title: `${project.title} — Versão V2 (Corte Final)`,
       version: 'V2',
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800&auto=format&fit=crop&q=80',
+      videoUrl: undefined,
+      thumbnailUrl: undefined,
       status: 'pendente' as const,
       comments: []
     };
@@ -1126,6 +1126,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const current = project.mediaApproval || { id: 'med_' + projectId, title: `${project.title} — Aprovação`, version: 'V1', status: 'pendente' as const, comments: [] };
     const updated = { ...project, mediaApproval: { ...current, [kind === 'video' ? 'videoUrl' : 'thumbnailUrl']: reference } };
     await updateMediaApprovalAsset(authUserId, projectId, { id: updated.mediaApproval?.id, title: updated.mediaApproval?.title, version: updated.mediaApproval?.version, status: updated.mediaApproval?.status, videoUrl: updated.mediaApproval?.videoUrl, thumbnailUrl: updated.mediaApproval?.thumbnailUrl });
+    const previousReference = kind === 'video' ? current.videoUrl : current.thumbnailUrl;
+    if (previousReference && previousReference !== reference && isStorageReference(previousReference)) {
+      void removeWorkspaceFile(previousReference).catch(error => console.error('StudioDesk: arquivo substituído não pôde ser removido', error));
+    }
     setProjects(prev => prev.map(p => p.id === projectId ? updated : p));
   };
 

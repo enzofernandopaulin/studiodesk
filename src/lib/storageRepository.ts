@@ -6,6 +6,7 @@ export const PROFILE_AVATAR_BUCKET = 'studiodesk-avatars';
 export const STORAGE_REFERENCE_PREFIX = 'storage://';
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
+const STANDARD_UPLOAD_LIMIT = 6 * 1024 * 1024;
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
 const allowedAvatarMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -40,7 +41,42 @@ export function parseStorageReference(value: string): { bucket: string; path: st
   const raw = value.slice(STORAGE_REFERENCE_PREFIX.length);
   const separator = raw.indexOf('/');
   if (separator <= 0 || separator === raw.length - 1) return null;
-  return { bucket: raw.slice(0, separator), path: raw.slice(separator + 1) };
+  const bucket = raw.slice(0, separator);
+  const path = raw.slice(separator + 1);
+  if (bucket !== STORAGE_BUCKET || path.split('/').some(segment => !segment || segment === '.' || segment === '..')) return null;
+  return { bucket, path };
+}
+
+async function uploadResumable(objectName: string, file: File): Promise<void> {
+  if (!supabase) throw new Error('Supabase não está configurado.');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Sessão expirada. Entre novamente.');
+  const baseUrl = String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  const anonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY || '');
+  const encode = (value: string) => btoa(value);
+  const created = await fetch(`${baseUrl}/storage/v1/upload/resumable`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${session.access_token}`, apikey: anonKey,
+      'tus-resumable': '1.0.0', 'upload-length': String(file.size), 'x-upsert': 'false',
+      'upload-metadata': `bucketName ${encode(STORAGE_BUCKET)},objectName ${encode(objectName)},contentType ${encode(file.type || 'application/octet-stream')},cacheControl ${encode('3600')}`,
+    },
+  });
+  if (!created.ok) throw new Error('Não foi possível iniciar o upload retomável.');
+  const location = created.headers.get('location');
+  if (!location) throw new Error('O servidor não retornou o endereço do upload.');
+  const uploadUrl = new URL(location, baseUrl).toString();
+  const chunkSize = 6 * 1024 * 1024;
+  let offset = 0;
+  while (offset < file.size) {
+    const response = await fetch(uploadUrl, {
+      method: 'PATCH',
+      headers: { authorization: `Bearer ${session.access_token}`, apikey: anonKey, 'tus-resumable': '1.0.0', 'upload-offset': String(offset), 'content-type': 'application/offset+octet-stream' },
+      body: file.slice(offset, Math.min(offset + chunkSize, file.size)),
+    });
+    if (!response.ok) throw new Error('O upload foi interrompido. Tente novamente.');
+    offset = Number(response.headers.get('upload-offset') || Math.min(offset + chunkSize, file.size));
+  }
 }
 
 export async function uploadWorkspaceFile(userId: string, file: File, category = 'files'): Promise<string> {
@@ -56,13 +92,16 @@ export async function uploadWorkspaceFile(userId: string, file: File, category =
   const baseName = safeName(file.name).replace(/\.[^.]+$/, '');
   const objectName = `${workspaceId}/${folderFor(category)}/${userId}/${crypto.randomUUID()}-${baseName}.${extension}`;
 
-  const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(objectName, file, {
-    cacheControl: '3600',
-    contentType: file.type || 'application/octet-stream',
-    upsert: false,
-  });
-
-  if (error) throw error;
+  if (file.size > STANDARD_UPLOAD_LIMIT) {
+    await uploadResumable(objectName, file);
+  } else {
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(objectName, file, {
+      cacheControl: '3600',
+      contentType: file.type || 'application/octet-stream',
+      upsert: false,
+    });
+    if (error) throw error;
+  }
   return `${STORAGE_REFERENCE_PREFIX}${STORAGE_BUCKET}/${objectName}`;
 }
 
@@ -105,11 +144,16 @@ export async function uploadProfileAvatar(userId: string, file: File): Promise<s
   if (error) throw error;
 
   const { data } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(path);
-  return `${data.publicUrl}?v=${Date.now()}`;
+  const publicUrl = `${data.publicUrl}?v=${Date.now()}`;
+  const { error: profileError } = await supabase.from('profiles').update({ avatar: publicUrl, updated_at: new Date().toISOString() }).eq('id', userId);
+  if (profileError) throw profileError;
+  return publicUrl;
 }
 
 export async function loadProfileAvatarUrl(userId: string): Promise<string | null> {
   if (!supabase || !userId) return null;
+  const { data: profile } = await supabase.from('profiles').select('avatar').eq('id', userId).maybeSingle();
+  if (profile?.avatar) return profile.avatar;
   const { data: objects, error } = await supabase.storage
     .from(PROFILE_AVATAR_BUCKET)
     .list(userId, { limit: 1, search: 'profile' });
