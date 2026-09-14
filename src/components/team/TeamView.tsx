@@ -8,7 +8,7 @@ export const TeamView: React.FC = () => {
   const { team, removeTeamMember, refreshTeam, user, setCurrentView, addToast } = useApp();
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [teamName, setTeamName] = useState(user.companyName || 'Minha Equipe');
-  const [linkPermission, setLinkPermission] = useState<'admin' | 'gestor' | 'colaborador'>('colaborador');
+  const [linkPermission, setLinkPermission] = useState<'gestor' | 'colaborador'>('colaborador');
   const [inviteLink, setInviteLink] = useState('');
   const [inviteMaxUses, setInviteMaxUses] = useState(0);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
@@ -157,7 +157,7 @@ export const TeamView: React.FC = () => {
             <div className="flex items-center justify-between border-b border-[#DDE3E8] pb-3"><h3 className="font-display text-lg font-black uppercase">Criar equipe e link</h3><button onClick={() => setIsLinkModalOpen(false)}><X className="w-5 h-5" /></button></div>
             {!inviteLink ? <form onSubmit={handleCreateTeamLink} className="space-y-4">
               <div><label className="block text-xs font-bold mb-1">Nome da equipe</label><input required value={teamName} onChange={e => setTeamName(e.target.value)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm" /></div>
-              <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option><option value="admin">Administrador</option></select></div>
+              <div><label className="block text-xs font-bold mb-1">Permissão de quem entrar</label><select value={linkPermission} onChange={e => setLinkPermission(e.target.value as typeof linkPermission)} className="w-full px-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-sm"><option value="colaborador">Colaborador</option><option value="gestor">Gestor</option></select></div>
               <button disabled={isGeneratingLink} className="w-full bg-[#111111] text-white font-bold text-sm py-3 rounded-xl disabled:bg-gray-400">{isGeneratingLink ? 'Criando...' : 'Criar equipe e gerar link'}</button>
             </form> : <div className="space-y-4"><p className="text-sm text-[#6B7280]">Envie este link aos seus colegas. Ele expira em 7 dias e aceita até {inviteMaxUses} {inviteMaxUses === 1 ? 'entrada' : 'entradas'}, conforme as vagas restantes do plano.</p><div className="break-all rounded-xl bg-[#F5F7F9] border border-[#DDE3E8] p-3 text-xs">{inviteLink}</div><button onClick={copyInviteLink} className="w-full flex items-center justify-center gap-2 bg-[#111111] text-white font-bold text-sm py-3 rounded-xl"><Copy className="w-4 h-4 text-[#66acd7]" />Copiar link</button></div>}
           </div>

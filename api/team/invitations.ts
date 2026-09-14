@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
 
-type Role = 'admin' | 'gestor' | 'colaborador';
+type Role = 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
 
 export default async function handler(request: any, response: any) {
@@ -118,7 +118,7 @@ export default async function handler(request: any, response: any) {
 
     const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
     const teamName = typeof body.teamName === 'string' ? body.teamName.trim().slice(0, 120) : '';
-    const role: Role = ['admin','gestor','colaborador'].includes(body.role) ? body.role : 'colaborador';
+    const role: Role = ['gestor','colaborador'].includes(body.role) ? body.role : 'colaborador';
     const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
     if (!appUrl.startsWith('https://')) return response.status(503).json({ error: 'APP_URL não está configurada corretamente.' });
     if (teamName) {

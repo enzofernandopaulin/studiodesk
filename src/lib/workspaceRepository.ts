@@ -203,7 +203,6 @@ export async function completeOnboarding(user: UserProfile, columns: KanbanColum
     p_name: user.name,
     // A foto é armazenada no bucket studiodesk-avatars, nunca em profiles.
     p_avatar: '',
-    p_plan: user.plan,
     p_business_type: user.businessType,
     p_team_size: user.teamSize,
     p_objectives: user.objectives,
@@ -233,7 +232,6 @@ export async function saveProfile(user: UserProfile): Promise<void> {
   // registro; usar upsert exigiria permissão de INSERT e seria bloqueado pelo RLS.
   const { data, error } = await supabase.from('profiles').update({
     name:user.name,
-    plan:user.plan,
     business_type:user.businessType,
     team_size:user.teamSize,
     objectives:user.objectives,
