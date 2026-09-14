@@ -77,46 +77,45 @@ export async function getWorkspaceId(userId: string): Promise<string | null> {
 }
 
 export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState | null> {
-  if (!supabase) return null;
-  if (!workspaceId) return null;
+  if (!supabase || !workspaceId) return null;
 
-  // Núcleo necessário ao dashboard e à navegação principal. Módulos menos
-  // frequentes são carregados sob demanda pelo AppContext.
-  const [leads, clients, columns, projects, deliverables, media, comments, tasks, timeline] = await Promise.all([
+  const [leads, clients, columns, projects, tasks, timeline] = await Promise.all([
     supabase.from('leads').select(LEAD_COLUMNS).eq('workspace_id', workspaceId).order('created_at', { ascending:false }).order('id').limit(100),
     supabase.from('clients').select(CLIENT_COLUMNS).eq('workspace_id', workspaceId).order('created_at', { ascending:false }).order('id').limit(100),
     supabase.from('kanban_columns').select(COLUMN_COLUMNS).eq('workspace_id', workspaceId).order('sort_order'),
     supabase.from('projects').select(PROJECT_COLUMNS).eq('workspace_id', workspaceId).order('created_at', { ascending:false }).order('id').limit(100),
-    supabase.from('project_deliverables').select(DELIVERABLE_COLUMNS).eq('workspace_id', workspaceId),
-    supabase.from('media_approvals').select(MEDIA_COLUMNS).eq('workspace_id', workspaceId),
-    supabase.from('approval_comments').select(COMMENT_COLUMNS).eq('workspace_id', workspaceId),
     supabase.from('tasks').select(TASK_COLUMNS).eq('workspace_id', workspaceId).order('created_at', { ascending:false }).order('id').limit(100),
     supabase.from('timeline_events').select(TIMELINE_COLUMNS).eq('workspace_id', workspaceId).order('timestamp_value', { ascending:false }).order('id').limit(20),
   ]);
-
-  const result = [leads, clients, columns, projects, deliverables, media, comments, tasks, timeline];
-  const failed = result.find(r => r.error);
+  const core = [leads, clients, columns, projects, tasks, timeline];
+  const failed = core.find(result => result.error);
   if (failed?.error) throw failed.error;
 
   const projectRows = projects.data ?? [];
-  const clientNames = new Map((clients.data ?? []).map(c => [c.id, c.company || c.name]));
-  const mediaByProject = new Map((media.data ?? []).map(m => [m.project_id, m]));
-  const commentsRows = comments.data ?? [];
+  const projectIds = projectRows.map(project => project.id);
+  const [deliverables, media] = projectIds.length ? await Promise.all([
+    supabase.from('project_deliverables').select(DELIVERABLE_COLUMNS).eq('workspace_id', workspaceId).in('project_id', projectIds),
+    supabase.from('media_approvals').select(MEDIA_COLUMNS).eq('workspace_id', workspaceId).in('project_id', projectIds),
+  ]) : [{ data: [], error: null }, { data: [], error: null }];
+  if (deliverables.error) throw deliverables.error;
+  if (media.error) throw media.error;
+  const mediaIds = (media.data ?? []).map(item => item.id);
+  const comments = mediaIds.length
+    ? await supabase.from('approval_comments').select(COMMENT_COLUMNS).eq('workspace_id', workspaceId).in('media_approval_id', mediaIds)
+    : { data: [], error: null };
+  if (comments.error) throw comments.error;
 
+  const clientNames = new Map((clients.data ?? []).map(client => [client.id, client.company || client.name]));
+  const mediaByProject = new Map((media.data ?? []).map(item => [item.project_id, item]));
   return {
     leads: (leads.data ?? []).map(mapLead),
     clients: (clients.data ?? []).map(mapClient),
-    kanbanColumns: (columns.data ?? []).map(c => ({ id:c.id,title:c.title,color:c.color,order:c.sort_order })),
-    projects: projectRows.map(r => ({ ...mapProject(r, deliverables.data ?? [], mediaByProject.get(r.id), commentsRows), clientName:clientNames.get(r.client_id) ?? '' })),
-    tasks: (tasks.data ?? []).map(r => ({ id:r.id,title:r.title,projectId:clean(r.project_id),projectTitle:'',clientId:clean(r.client_id),clientName:clientNames.get(r.client_id) ?? undefined,assignedTo:r.assigned_to,assignedAvatar:clean(r.assigned_avatar),deadline:r.deadline,priority:r.priority,description:clean(r.description),completed:r.completed,completedAt:clean(r.completed_at),createdAt:r.created_at })),
-    calendarEvents: [],
-    approvalRequests: [],
-    messages: [],
-    communications: [],
-    timelineEvents: (timeline.data ?? []).map(r => ({ id:r.id,timestamp:r.timestamp_value,timeString:r.time_string,actor:r.actor,actorAvatar:clean(r.actor_avatar),action:r.action,details:clean(r.details),category:r.category,referenceId:clean(r.reference_id) })),
-    // A fonte canônica da equipe é workspace_members, carregada pela API autenticada.
-    team: [],
-    integrations: [],
+    kanbanColumns: (columns.data ?? []).map(column => ({ id:column.id,title:column.title,color:column.color,order:column.sort_order })),
+    projects: projectRows.map(project => ({ ...mapProject(project, deliverables.data ?? [], mediaByProject.get(project.id), comments.data ?? []), clientName:clientNames.get(project.client_id) ?? '' })),
+    tasks: (tasks.data ?? []).map(row => ({ id:row.id,title:row.title,projectId:clean(row.project_id),projectTitle:'',clientId:clean(row.client_id),clientName:clientNames.get(row.client_id) ?? undefined,assignedTo:row.assigned_to,assignedAvatar:clean(row.assigned_avatar),deadline:row.deadline,priority:row.priority,description:clean(row.description),completed:row.completed,completedAt:clean(row.completed_at),createdAt:row.created_at })),
+    calendarEvents: [], approvalRequests: [], messages: [], communications: [],
+    timelineEvents: (timeline.data ?? []).map(row => ({ id:row.id,timestamp:row.timestamp_value,timeString:row.time_string,actor:row.actor,actorAvatar:clean(row.actor_avatar),action:row.action,details:clean(row.details),category:row.category,referenceId:clean(row.reference_id) })),
+    team: [], integrations: [],
   };
 }
 
@@ -135,14 +134,15 @@ export async function loadWorkspacePatch(
   const projectAggregateChanged = changedTables.some(table =>
     ['projects', 'project_deliverables', 'media_approvals', 'approval_comments'].includes(table),
   );
-  const clientsChanged = requested.has('clients') && !range;
+  const clientsChanged = requested.has('clients');
+  const refreshClientDependencies = clientsChanged && !range;
   const needClients = clientsChanged || projectAggregateChanged || requested.has('tasks') ||
     requested.has('calendar_events') || requested.has('approval_requests');
-  const needProjects = projectAggregateChanged || clientsChanged || requested.has('approval_requests');
-  const needProjectAggregate = projectAggregateChanged || clientsChanged;
-  const needTasks = requested.has('tasks') || clientsChanged;
-  const needCalendar = requested.has('calendar_events') || clientsChanged;
-  const needApprovals = requested.has('approval_requests') || projectAggregateChanged || clientsChanged;
+  const needProjects = projectAggregateChanged || refreshClientDependencies || requested.has('approval_requests');
+  const needProjectAggregate = projectAggregateChanged || refreshClientDependencies;
+  const needTasks = requested.has('tasks') || refreshClientDependencies;
+  const needCalendar = requested.has('calendar_events') || refreshClientDependencies;
+  const needApprovals = requested.has('approval_requests') || projectAggregateChanged || refreshClientDependencies;
   const paginatedTables = new Set(['leads','clients','projects','tasks','calendar_events','approval_requests','messages','communications','timeline_events','integrations']);
   const paginate = (table: string, query: any) => range && requested.has(table) && paginatedTables.has(table)
     ? query.range(range.from, range.to)
