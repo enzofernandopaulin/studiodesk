@@ -220,6 +220,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const authDestinationRef = useRef<ActiveView | null>(null);
   const loadedUserRef = useRef<string | null>(null);
+  const explicitSignInRef = useRef(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(!isSupabaseConfigured);
   const [isHydrated, setIsHydrated] = useState(!isSupabaseConfigured);
@@ -413,7 +414,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN' && session?.user.id === loadedUserRef.current) return;
+      // O login iniciado pelo formulário carrega o workspace e conclui a
+      // navegação dentro de signIn(). Assim evitamos duas cargas simultâneas.
+      if (event === 'SIGNED_IN' && explicitSignInRef.current) return;
+      if (event === 'SIGNED_IN' && session?.user.id === loadedUserRef.current) {
+        const destination = authDestinationRef.current ?? 'dashboard';
+        authDestinationRef.current = null;
+        setCurrentView(destination);
+        return;
+      }
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY') {
         void applySession(session, event);
       }
@@ -614,12 +623,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const signIn = async (email: string, password: string) => {
     if (!supabase) return { error: 'Supabase não está configurado. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.' };
-    authDestinationRef.current = 'dashboard';
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
+    explicitSignInRef.current = true;
+    authDestinationRef.current = null;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      explicitSignInRef.current = false;
       authDestinationRef.current = null;
-      return { error: error.message };
+      return { error: error?.message ?? 'O Supabase não retornou o usuário autenticado.' };
     }
+
+    setAuthReady(false);
+    setIsHydrated(false);
+    const needsOnboarding = await loadAuthenticatedData(data.user.id);
+    explicitSignInRef.current = false;
+    setAuthReady(true);
+
+    if (needsOnboarding === null) {
+      return { error: 'Login confirmado, mas não foi possível carregar seu workspace. Use a opção de tentar novamente.' };
+    }
+
+    setCurrentView(needsOnboarding ? 'profile_select' : 'dashboard');
     return {};
   };
 

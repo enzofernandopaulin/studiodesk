@@ -77,6 +77,13 @@ export const App: React.FC = () => {
       return;
     }
     if (!isAuthenticated) return;
+    // Um usuário já autenticado nunca deve permanecer na landing ou no
+    // formulário de login. Esse fallback cobre retomadas de sessão e cliques
+    // no link de login enquanto a conta já está carregada.
+    if (isPublicView) {
+      setCurrentView('dashboard');
+      return;
+    }
     // A sessão restaurada pelo Supabase permanece autenticada após recarregar.
     const permission = viewPermission[currentView];
     if (permission && !can(permission)) setCurrentView('dashboard');
