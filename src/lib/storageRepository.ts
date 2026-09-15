@@ -96,7 +96,14 @@ export async function uploadProfileAvatar(userId: string, file: File): Promise<s
   if (!allowedAvatarMimeTypes.has(file.type)) throw new Error('Use uma imagem JPG, PNG ou WEBP.');
   if (file.size > MAX_AVATAR_SIZE) throw new Error('A foto deve ter no máximo 5 MB.');
 
-  const path = avatarObjectPath(userId);
+  // O caminho precisa nascer da sessão confirmada pelo Supabase. Usar apenas
+  // o ID guardado no estado da tela pode gerar uma pasta diferente do
+  // auth.uid() e, corretamente, ser bloqueado pelo RLS do Storage.
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+  if (authError || !authData.user) throw new Error('Sua sessão expirou. Entre novamente para enviar a foto.');
+  if (authData.user.id !== userId) throw new Error('A sessão do perfil mudou. Recarregue a página e tente novamente.');
+
+  const path = avatarObjectPath(authData.user.id);
   const { error } = await supabase.storage.from(PROFILE_AVATAR_BUCKET).upload(path, file, {
     cacheControl: '3600',
     contentType: file.type,
