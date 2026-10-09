@@ -1,18 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
-import { 
-  CheckCircle2, 
-  Circle, 
-  ArrowRight, 
-  UserPlus, 
-  FolderPlus, 
-  Columns3, 
-  Globe, 
-  Users, 
-  Sparkles,
-  LayoutDashboard
-} from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRight, UserPlus, FolderPlus, Globe, Users, Sparkles, LayoutDashboard } from 'lucide-react';
 
 interface FirstAccessProps {
   onOpenClientModal?: () => void;

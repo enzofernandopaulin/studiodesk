@@ -1,23 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CalendarEvent, CalendarEventType, CalendarEventStatus } from '../../types';
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  Users, 
-  User, 
-  FileText, 
-  MapPin, 
-  Tag, 
-  CheckCircle2, 
-  Video, 
-  Phone, 
-  Presentation, 
-  CheckSquare, 
-  AlertCircle, 
-  MoreHorizontal 
-} from 'lucide-react';
+import { X, Calendar, Users, MapPin, Video, Phone, Presentation, CheckSquare, AlertCircle, MoreHorizontal } from 'lucide-react';
 
 interface CalendarEventModalProps {
   isOpen: boolean;

@@ -148,7 +148,6 @@ export const App: React.FC = () => {
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Header
             onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
-            onOpenSearch={() => setIsSearchOpen(true)}
             onOpenQuickCreate={handleOpenQuickCreate}
           />
 

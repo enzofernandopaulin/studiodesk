@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Client, ClientStatus } from '../../types';
-import { X, UserPlus, Building2, Mail, Phone, MessageSquare, Globe, Briefcase, Tag, FileText } from 'lucide-react';
+import { X, UserPlus, Mail, MessageSquare } from 'lucide-react';
 
 interface ClientModalProps {
   isOpen: boolean;

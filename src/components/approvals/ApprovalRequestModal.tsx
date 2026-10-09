@@ -2,23 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ApprovalRequest, ApprovalCategory, ApprovalStatus, Priority } from '../../types';
 import { uploadWorkspaceFile, isStorageReference } from '../../lib/storageRepository';
-import { 
-  X, 
-  ShieldCheck, 
-  FileText, 
-  Calendar, 
-  Clock, 
-  FolderKanban, 
-  Users, 
-  Building2, 
-  FileVideo, 
-  Image, 
-  FileSpreadsheet, 
-  Link as LinkIcon, 
-  AlertCircle,
-  UploadCloud,
-  Loader2
-} from 'lucide-react';
+import { X, ShieldCheck, Link as LinkIcon, UploadCloud, Loader2 } from 'lucide-react';
 
 interface ApprovalRequestModalProps {
   isOpen: boolean;

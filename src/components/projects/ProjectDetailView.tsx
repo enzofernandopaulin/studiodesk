@@ -1,25 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Clock, 
-  User, 
-  DollarSign, 
-  CheckSquare, 
-  MessageSquare, 
-  FileVideo, 
-  Paperclip, 
-  History, 
-  Edit, 
-  Trash2, 
-  Plus, 
-  Columns3, 
-  CheckCircle2, 
-  Circle,
-  ExternalLink,
-  Send
-} from 'lucide-react';
+import { ArrowLeft, Calendar, User, DollarSign, CheckSquare, FileVideo, Paperclip, Edit, Trash2, Plus, CheckCircle2, Circle, ExternalLink, Send } from 'lucide-react';
 import { MediaApprovalView } from './MediaApprovalView';
 import { ProjectModal } from './ProjectModal';
 
@@ -27,7 +8,6 @@ export const ProjectDetailView: React.FC = () => {
   const { 
     projects = [], 
     selectedProjectId, 
-    setSelectedProjectId, 
     setCurrentView, 
     kanbanColumns = [], 
     moveProjectToColumn, 

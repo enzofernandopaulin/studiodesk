@@ -15,24 +15,7 @@ import {
   Area,
   Legend
 } from 'recharts';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  Users, 
-  FolderKanban, 
-  CheckSquare, 
-  DollarSign, 
-  Sparkles, 
-  ShieldCheck, 
-  Calendar, 
-  Filter, 
-  Download, 
-  RefreshCw,
-  Award,
-  Clock,
-  ArrowUpRight,
-  PieChart as PieIcon
-} from 'lucide-react';
+import { BarChart3, TrendingUp, Users, FolderKanban, CheckSquare, DollarSign, Sparkles, ShieldCheck } from 'lucide-react';
 
 export const OperationalMetricsView: React.FC = () => {
   const { 
@@ -40,7 +23,6 @@ export const OperationalMetricsView: React.FC = () => {
     clients = [], 
     projects = [], 
     tasks = [], 
-    calendarEvents = [], 
     approvalRequests = [] 
   } = useApp();
 
@@ -183,8 +165,6 @@ export const OperationalMetricsView: React.FC = () => {
       approvalStatusBreakdown
     };
   }, [approvalRequests]);
-
-  const COLORS = ['#66acd7', '#2F6F9C', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#6B7280'];
 
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8" id="operational-metrics-dashboard">

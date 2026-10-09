@@ -1,19 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Task, PriorityLevel } from '../../types';
-import { 
-  CheckSquare, 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  User, 
-  CheckCircle2, 
-  Circle, 
-  Trash2, 
-  Clock,
-  FolderKanban
-} from 'lucide-react';
+import { PriorityLevel } from '../../types';
+import { CheckSquare, Plus, Search, CheckCircle2, Circle, Trash2, FolderKanban } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState';
 
 export const TasksView: React.FC = () => {
@@ -26,7 +14,7 @@ export const TasksView: React.FC = () => {
   const [newProjectId, setNewProjectId] = useState(projects[0]?.id || '');
   const [newAssignedTo, setNewAssignedTo] = useState(user.name);
   const [newDueDate, setNewDueDate] = useState('2025-05-15');
-  const [newPriority, setNewPriority] = useState<PriorityLevel>('alta');
+  const [newPriority] = useState<PriorityLevel>('alta');
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {

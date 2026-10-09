@@ -2,28 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StorageAsset } from '../common/StorageAsset';
 import { ApprovalRequest, ApprovalStatus } from '../../types';
-import { 
-  X, 
-  ShieldCheck, 
-  CheckCircle2, 
-  XCircle, 
-  RotateCcw, 
-  Clock, 
-  Calendar, 
-  User, 
-  Building2, 
-  FolderKanban, 
-  ExternalLink, 
-  Copy, 
-  Check, 
-  Edit3, 
-  Trash2, 
-  FileVideo, 
-  MessageSquare, 
-  AlertCircle,
-  FileText,
-  Send
-} from 'lucide-react';
+import { X, ShieldCheck, CheckCircle2, XCircle, RotateCcw, Clock, Calendar, ExternalLink, Copy, Check, Edit3, Trash2, FileVideo } from 'lucide-react';
 
 interface ApprovalDetailModalProps {
   isOpen: boolean;

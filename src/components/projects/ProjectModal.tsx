@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Project, PriorityLevel } from '../../types';
-import { X, FolderPlus, Building2, User, Calendar, DollarSign, Tag, ListChecks } from 'lucide-react';
+import { X, FolderPlus, DollarSign } from 'lucide-react';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -26,7 +26,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
   const [deadline, setDeadline] = useState(projectToEdit?.deadline || '2025-05-15');
   const [budget, setBudget] = useState(projectToEdit?.budget?.toString() || '6500');
   const [description, setDescription] = useState(projectToEdit?.description || '');
-  const [tags, setTags] = useState<string[]>(projectToEdit?.tags || ['Vídeo 4K', 'Institucional']);
+  const [tags] = useState<string[]>(projectToEdit?.tags || ['Vídeo 4K', 'Institucional']);
 
   if (!isOpen) return null;
 

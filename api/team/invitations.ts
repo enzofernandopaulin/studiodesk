@@ -1,11 +1,18 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
+import { sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { rateLimit, requireAllowedOrigin } from '../_lib/security.js';
 
 type Role = 'admin' | 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
 
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
+  const webRequest = toWebRequest(request);
+  const limited = rateLimit(webRequest, 30);
+  if (limited) return sendWebResponse(limited, response);
+  const originError = requireAllowedOrigin(webRequest);
+  if (originError) return sendWebResponse(originError, response);
   try {
     const resource = Array.isArray(request.query?.resource) ? request.query.resource[0] : request.query?.resource;
 

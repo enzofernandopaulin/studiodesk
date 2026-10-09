@@ -1,25 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Building2, 
-  Mail, 
-  Phone, 
-  Globe, 
-  MessageSquare, 
-  Calendar, 
-  Clock, 
-  FolderKanban, 
-  Plus, 
-  ArrowLeft, 
-  Edit, 
-  Trash2, 
-  CheckCircle2, 
-  Send, 
-  Tag, 
-  FileText, 
-  Activity,
-  Briefcase
-} from 'lucide-react';
+import { Mail, Phone, Globe, MessageSquare, Plus, ArrowLeft, Edit, Send, Briefcase } from 'lucide-react';
 import { ClientModal } from './ClientModal';
 
 interface ClientProfileViewProps {
@@ -30,12 +11,10 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onOpenNewP
   const { 
     clients = [], 
     selectedClientId, 
-    setSelectedClientId, 
     setCurrentView, 
     projects = [], 
     setSelectedProjectId, 
     updateClient, 
-    deleteClient,
     communications = [],
     addCommunication,
     timelineEvents = [],
@@ -44,7 +23,6 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onOpenNewP
 
   const [activeTab, setActiveTab] = useState<'geral' | 'projetos' | 'atividades' | 'notas' | 'comunicacao'>('geral');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [noteContent, setNoteContent] = useState('');
   const [msgInput, setMsgInput] = useState('');
   const [msgChannel, setMsgChannel] = useState<'whatsapp' | 'email' | 'interno'>('whatsapp');
 
@@ -72,13 +50,6 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onOpenNewP
   const clientProjects = safeProjects.filter(p => p.clientId === client.id);
   const clientCommunications = safeComms.filter(c => c.clientId === client.id);
   const clientEvents = safeEvents.filter(e => e.referenceId === client.id || (e as any).entityId === client.id || clientProjects.some(p => p.id === e.referenceId || p.id === (e as any).entityId));
-
-  const handleSaveNotes = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (updateClient) {
-      updateClient(client.id, { notes: noteContent });
-    }
-  };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();

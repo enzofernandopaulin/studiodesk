@@ -2,22 +2,7 @@ import React, { useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StorageAsset } from '../common/StorageAsset';
 import { Project, ApprovalComment } from '../../types';
-import { 
-  Play, 
-  Pause, 
-  CheckCircle2, 
-  AlertCircle, 
-  MessageSquare, 
-  Share2, 
-  Clock, 
-  Send, 
-  Sparkles, 
-  FileVideo,
-  Copy,
-  ExternalLink,
-  ThumbsUp,
-  RotateCcw
-} from 'lucide-react';
+import { Play, Pause, CheckCircle2, MessageSquare, Send, Copy, RotateCcw } from 'lucide-react';
 
 interface MediaApprovalProps {
   project: Project;

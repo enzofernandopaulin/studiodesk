@@ -7,26 +7,18 @@ import {
   XCircle, 
   Sparkles, 
   Layers, 
-  Workflow, 
-  Clock, 
-  MessageSquare, 
   ShieldCheck, 
   Globe, 
   Columns3, 
-  Users, 
   ChevronRight, 
   Play, 
-  Laptop, 
   Check, 
   Building2, 
   User, 
   FileVideo, 
-  TrendingUp,
-  BarChart3,
   Trophy,
   Rocket
 } from 'lucide-react';
-import { motion } from 'motion/react';
 
 export const LandingPage: React.FC = () => {
   const { setCurrentView } = useApp();

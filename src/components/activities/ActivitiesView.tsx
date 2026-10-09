@@ -1,20 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Activity, 
-  Search, 
-  Filter, 
-  Sparkles, 
-  CheckCircle2, 
-  FolderKanban, 
-  Users, 
-  MessageSquare, 
-  FileVideo,
-  Clock
-} from 'lucide-react';
+import { Activity, Search, Sparkles, CheckCircle2, FolderKanban, Users, MessageSquare, FileVideo, Clock } from 'lucide-react';
 
 export const ActivitiesView: React.FC = () => {
-  const { timelineEvents = [], user } = useApp();
+  const { timelineEvents = [] } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('todos');
 

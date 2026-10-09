@@ -1,12 +1,12 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
-import { User, Building2, Check, ArrowRight, Sparkles, Layers } from 'lucide-react';
+import { Check, ArrowRight } from 'lucide-react';
 import { PlanType } from '../../types';
 import { PLANS_LIST } from '../../data/plans';
 
 export const ProfileSelection: React.FC = () => {
-  const { user, setPlan, setCurrentView } = useApp();
+  const { setPlan, setCurrentView } = useApp();
 
   const handleSelect = (selectedPlan: PlanType) => {
     setPlan(selectedPlan);
@@ -28,9 +28,6 @@ export const ProfileSelection: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {PLANS_LIST.map((p) => {
-            const isSelected = user.plan === p.id || (user.plan === 'individual' && p.id === 'solo');
-            const isDark = p.id === 'studio' || p.id === 'empresa';
-
             return (
               <div
                 key={p.id}

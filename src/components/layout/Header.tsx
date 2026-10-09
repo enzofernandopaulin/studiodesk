@@ -26,10 +26,9 @@ import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 interface HeaderProps {
   onOpenMobileMenu?: () => void;
   onOpenQuickCreate: (type: 'lead' | 'client' | 'project' | 'task') => void;
-  onOpenSearch?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCreate, onOpenSearch }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCreate }) => {
   const {
     user,
     user: { plan },

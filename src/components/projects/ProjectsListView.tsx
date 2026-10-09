@@ -1,21 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Project, PriorityLevel } from '../../types';
-import { 
-  FolderKanban, 
-  Plus, 
-  Search, 
-  Columns3, 
-  Calendar, 
-  DollarSign, 
-  User, 
-  Trash2, 
-  Edit, 
-  ArrowRight,
-  Sparkles,
-  Building2,
-  CheckCircle2
-} from 'lucide-react';
+import { Project } from '../../types';
+import { FolderKanban, Plus, Search, Columns3, Trash2, Edit, ArrowRight } from 'lucide-react';
 import { ProjectModal } from './ProjectModal';
 import { EmptyState } from '../common/EmptyState';
 

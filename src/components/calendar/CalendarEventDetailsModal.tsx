@@ -1,28 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { CalendarEvent } from '../../types';
-import { 
-  X, 
-  Calendar, 
-  Clock, 
-  User, 
-  Users, 
-  FileText, 
-  MapPin, 
-  CheckCircle2, 
-  XCircle, 
-  Edit3, 
-  Trash2, 
-  ExternalLink, 
-  Video, 
-  Phone, 
-  Presentation, 
-  CheckSquare, 
-  AlertCircle, 
-  MoreHorizontal,
-  RotateCcw,
-  Building2
-} from 'lucide-react';
+import { X, Calendar, Clock, Users, MapPin, CheckCircle2, XCircle, Edit3, Trash2, ExternalLink, Video, Phone, Presentation, CheckSquare, AlertCircle, MoreHorizontal, RotateCcw } from 'lucide-react';
 
 interface CalendarEventDetailsModalProps {
   isOpen: boolean;

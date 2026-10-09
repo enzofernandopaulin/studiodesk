@@ -1,23 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Sparkles, 
-  Users, 
-  FolderKanban, 
-  CheckSquare, 
-  ArrowRight, 
-  Clock, 
-  Activity, 
-  Calendar, 
-  TrendingUp, 
-  AlertTriangle, 
-  Plus, 
-  Check, 
-  Building2, 
-  Globe, 
-  Columns3,
-  ExternalLink
-} from 'lucide-react';
+import { Sparkles, Users, FolderKanban, CheckSquare, ArrowRight, Clock, Activity, TrendingUp, Columns3 } from 'lucide-react';
 import { EmptyState } from '../common/EmptyState';
 
 interface DashboardViewProps {
@@ -34,9 +17,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickCreate 
     kanbanColumns, 
     timelineEvents, 
     setCurrentView, 
-    setSelectedClientId, 
-    setSelectedProjectId,
-    toggleTaskCompleted
+    setSelectedProjectId
   } = useApp();
 
   const activeLeadsCount = leads.filter(l => l.status === 'novo' || l.status === 'em_contato' || l.status === 'qualificado').length;

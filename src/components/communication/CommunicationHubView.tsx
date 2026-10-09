@@ -1,17 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  MessageSquare, 
-  Send, 
-  Search, 
-  Phone, 
-  Mail, 
-  Users, 
-  Building2, 
-  Clock, 
-  Sparkles,
-  CheckCheck
-} from 'lucide-react';
+import { MessageSquare, Send, Search } from 'lucide-react';
 
 export const CommunicationHubView: React.FC = () => {
   const { clients = [], communications = [], addCommunication, user } = useApp();

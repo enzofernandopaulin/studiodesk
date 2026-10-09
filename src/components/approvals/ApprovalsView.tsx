@@ -1,29 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ApprovalRequest, ApprovalStatus, ApprovalCategory, Priority } from '../../types';
-import { 
-  ShieldCheck, 
-  Plus, 
-  Search, 
-  Filter, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
-  RotateCcw, 
-  Calendar, 
-  Building2, 
-  FolderKanban, 
-  FileVideo, 
-  ExternalLink, 
-  Edit3, 
-  Trash2, 
-  Check, 
-  AlertCircle,
-  LayoutGrid,
-  List,
-  Layers,
-  ArrowRight
-} from 'lucide-react';
+import { ApprovalRequest, ApprovalStatus, ApprovalCategory } from '../../types';
+import { ShieldCheck, Plus, Search, Clock, CheckCircle2, XCircle, RotateCcw, Calendar, Building2, FolderKanban, Edit3, Trash2, LayoutGrid, List } from 'lucide-react';
 import { ApprovalRequestModal } from './ApprovalRequestModal';
 import { ApprovalDetailModal } from './ApprovalDetailModal';
 import { EmptyState } from '../common/EmptyState';
@@ -32,12 +10,7 @@ export const ApprovalsView: React.FC = () => {
   const { 
     approvalRequests = [], 
     clients, 
-    projects, 
-    updateApprovalStatus, 
     deleteApprovalRequest, 
-    setSelectedClientId, 
-    setSelectedProjectId, 
-    setCurrentView 
   } = useApp();
 
   // Filters & State

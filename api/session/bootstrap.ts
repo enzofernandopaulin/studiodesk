@@ -1,7 +1,14 @@
 import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { rateLimit, requireAllowedOrigin } from '../_lib/security.js';
 
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
+  const webRequest = toWebRequest(request);
+  const limited = rateLimit(webRequest, 20);
+  if (limited) return sendWebResponse(limited, response);
+  const originError = requireAllowedOrigin(webRequest);
+  if (originError) return sendWebResponse(originError, response);
   if (request.method !== 'POST') return response.status(405).json({ error: 'Método não permitido.' });
 
   try {

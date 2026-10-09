@@ -1,20 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Globe, 
-  MessageSquare, 
-  HardDrive, 
-  Share2, 
-  CheckCircle2, 
-  Power, 
-  ExternalLink, 
-  Sparkles, 
-  Code,
-  ShieldCheck
-} from 'lucide-react';
+import { Globe, MessageSquare, HardDrive, Share2, CheckCircle2, Power, Sparkles, Code, ShieldCheck } from 'lucide-react';
 
 export const IntegrationsView: React.FC = () => {
-  const { integrations, toggleIntegration, addToast, user } = useApp();
+  const { integrations, toggleIntegration, addToast } = useApp();
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   const handleCopyWebhook = () => {

@@ -1,26 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import {
-  ActiveView,
-  UserProfile,
-  PlanType,
-  Lead,
-  Client,
-  Project,
-  Task,
-  KanbanColumn,
-  TimelineEvent,
-  Message,
-  Communication,
-  CalendarEvent,
-  CalendarEventStatus,
-  ApprovalRequest,
-  ApprovalStatus,
-  ApprovalComment,
-  TeamMember,
-  IntegrationItem,
-  Priority
-} from '../types';
+import { ActiveView, UserProfile, PlanType, Lead, Client, Project, Task, KanbanColumn, TimelineEvent, Message, Communication, CalendarEvent, CalendarEventStatus, ApprovalRequest, ApprovalStatus, ApprovalComment, TeamMember, IntegrationItem } from '../types';
 import { DEFAULT_KANBAN_COLUMNS } from '../data/defaults';
 import { getPlanDetails } from '../data/plans';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';

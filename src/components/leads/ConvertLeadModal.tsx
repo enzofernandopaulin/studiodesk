@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Lead } from '../../types';
-import { X, CheckCircle2, UserCheck, FolderPlus, ArrowRight } from 'lucide-react';
+import { X, CheckCircle2, UserCheck, FolderPlus } from 'lucide-react';
 
 interface ConvertLeadModalProps {
   isOpen: boolean;

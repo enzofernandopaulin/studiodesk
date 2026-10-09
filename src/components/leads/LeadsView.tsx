@@ -1,24 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Lead, LeadStatus } from '../../types';
-import { 
-  Sparkles, 
-  Plus, 
-  Search, 
-  Filter, 
-  Phone, 
-  Mail, 
-  MessageSquare, 
-  UserCheck, 
-  Globe, 
-  Trash2, 
-  Edit, 
-  Calendar,
-  Building2,
-  Tag,
-  ArrowRight,
-  Check
-} from 'lucide-react';
+import { Sparkles, Plus, Search, Mail, MessageSquare, UserCheck, Trash2, Edit, Building2, Check } from 'lucide-react';
 import { LeadModal } from './LeadModal';
 import { ConvertLeadModal } from './ConvertLeadModal';
 import { EmptyState } from '../common/EmptyState';

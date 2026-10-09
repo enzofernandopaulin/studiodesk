@@ -1,4 +1,6 @@
 import { getAdminClient } from './_lib/supabaseAdmin.js';
+import { sendWebResponse, toWebRequest } from './_lib/http.js';
+import { rateLimit, requireAllowedOrigin } from './_lib/security.js';
 
 async function authenticate(request: any) {
   const accessToken = String(request.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
@@ -10,6 +12,11 @@ async function authenticate(request: any) {
 
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
+  const webRequest = toWebRequest(request);
+  const limited = rateLimit(webRequest, 30);
+  if (limited) return sendWebResponse(limited, response);
+  const originError = requireAllowedOrigin(webRequest);
+  if (originError) return sendWebResponse(originError, response);
   try {
     const { admin, user } = await authenticate(request);
     if (!user) return response.status(401).json({ error: 'Sessão inválida.' });

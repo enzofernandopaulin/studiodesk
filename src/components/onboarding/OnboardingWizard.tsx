@@ -3,26 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { completeOnboarding } from '../../lib/workspaceRepository';
 import { uploadProfileAvatar } from '../../lib/storageRepository';
 import { Logo } from '../common/Logo';
-import { 
-  ArrowRight, 
-  ArrowLeft, 
-  Check, 
-  User, 
-  Mail, 
-  Image as ImageIcon, 
-  Building2, 
-  Film, 
-  Megaphone, 
-  Share2, 
-  Laptop, 
-  Sparkles, 
-  LayoutTemplate,
-  Layers,
-  Columns3,
-  Globe,
-  Users,
-  MessageSquare
-} from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, User, Mail, Image as ImageIcon, Building2, Film, Megaphone, Share2, Laptop, Sparkles, Layers } from 'lucide-react';
 
 export const OnboardingWizard: React.FC = () => {
   const { user, setUser, setCurrentView, addToast, setKanbanColumns } = useApp();

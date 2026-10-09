@@ -1,26 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Project, PriorityLevel } from '../../types';
-import { 
-  Columns3, 
-  Plus, 
-  Search, 
-  Filter, 
-  Calendar, 
-  Clock, 
-  CheckSquare, 
-  Building2, 
-  User, 
-  ArrowLeft, 
-  ArrowRight, 
-  MoreHorizontal, 
-  Sparkles,
-  FileVideo,
-  CheckCircle2,
-  AlertCircle
-} from 'lucide-react';
+import { Plus, Search, Clock, CheckSquare, ArrowLeft, ArrowRight, FileVideo } from 'lucide-react';
 import { ProjectModal } from './ProjectModal';
-import { EmptyState } from '../common/EmptyState';
+
 
 export const KanbanBoardView: React.FC = () => {
   const { 

@@ -1,22 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { 
-  Settings, 
-  User, 
-  Building2, 
-  Columns3, 
-  Bell, 
-  Shield, 
-  Database, 
-  Check, 
-  Palette,
-  Layers,
-  Users,
-  CreditCard,
-  ArrowUpRight,
-  Camera
-} from 'lucide-react';
-import { PLANS_LIST, getPlanDetails, PlanType } from '../../data/plans';
+import { User, Columns3, Check, Palette, Camera } from 'lucide-react';
+import { getPlanDetails } from '../../data/plans';
 import { saveProfile } from '../../lib/workspaceRepository';
 import { uploadProfileAvatar } from '../../lib/storageRepository';
 
@@ -25,14 +10,13 @@ export const SettingsView: React.FC = () => {
     user, 
     setUser, 
     kanbanColumns, 
-    setKanbanColumns, 
     addToast
   } = useApp();
 
   const [userName, setUserName] = useState(user.name);
   const userEmail = user.email;
   const [companyName, setCompanyName] = useState(user.companyName);
-  const [template, setTemplate] = useState(user.template || 'Audiovisual');
+  const [template] = useState(user.template || 'Audiovisual');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 

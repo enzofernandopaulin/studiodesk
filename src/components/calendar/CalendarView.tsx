@@ -1,31 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { CalendarEvent, CalendarEventType, CalendarEventStatus } from '../../types';
-import { 
-  Calendar as CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  Clock, 
-  Plus, 
-  Video, 
-  Phone, 
-  Presentation, 
-  CheckSquare, 
-  AlertCircle, 
-  MoreHorizontal,
-  Users, 
-  CheckCircle2, 
-  XCircle, 
-  Filter, 
-  Search, 
-  CalendarDays, 
-  CalendarRange, 
-  Sun,
-  MapPin,
-  Check,
-  Building2,
-  Edit3
-} from 'lucide-react';
+import { CalendarEvent, CalendarEventType } from '../../types';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Video, Phone, Presentation, CheckSquare, AlertCircle, MoreHorizontal, Users, Search, CalendarDays, CalendarRange, Sun, MapPin, Check, Building2, Edit3 } from 'lucide-react';
 import { CalendarEventModal } from './CalendarEventModal';
 import { CalendarEventDetailsModal } from './CalendarEventDetailsModal';
 import { EmptyState } from '../common/EmptyState';
@@ -35,9 +11,6 @@ type ViewMode = 'month' | 'week' | 'day';
 export const CalendarView: React.FC = () => {
   const { 
     calendarEvents = [], 
-    clients, 
-    team, 
-    user, 
     updateCalendarEvent 
   } = useApp();
 
@@ -187,11 +160,6 @@ export const CalendarView: React.FC = () => {
   const weekDates = getWeekDates(currentDate);
 
   // Time Slots for Day & Week views (08:00 to 20:00)
-  const timeSlots = [
-    '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', 
-    '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
-  ];
-
   const currentDateYMD = currentDate.toISOString().split('T')[0];
 
   return (

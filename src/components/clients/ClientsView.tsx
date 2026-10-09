@@ -1,21 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
-import { Client, ClientStatus } from '../../types';
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Building2, 
-  Mail, 
-  Phone, 
-  MessageSquare, 
-  FolderKanban, 
-  Trash2, 
-  Edit, 
-  ArrowRight,
-  Sparkles,
-  Tag
-} from 'lucide-react';
+import { Client } from '../../types';
+import { Users, Plus, Search, Mail, MessageSquare, FolderKanban, Trash2, Edit, ArrowRight } from 'lucide-react';
 import { ClientModal } from './ClientModal';
 import { EmptyState } from '../common/EmptyState';
 

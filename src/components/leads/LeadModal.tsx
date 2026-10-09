@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Lead, LeadStatus } from '../../types';
-import { X, Sparkles, User, Building2, Mail, Phone, MessageSquare, Briefcase, FileText } from 'lucide-react';
+import { X, Sparkles, User, Building2, Mail, MessageSquare } from 'lucide-react';
 
 interface LeadModalProps {
   isOpen: boolean;
@@ -22,7 +22,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({ isOpen, onClose, leadToEdi
   const [assignedTo, setAssignedTo] = useState(leadToEdit?.assignedTo || user.name);
   const [notes, setNotes] = useState(leadToEdit?.notes || '');
   const [status, setStatus] = useState<LeadStatus>(leadToEdit?.status || 'novo');
-  const [value, setValue] = useState(leadToEdit?.value?.toString() || '7500');
+  const [value] = useState(leadToEdit?.value?.toString() || '7500');
 
   if (!isOpen) return null;
 
