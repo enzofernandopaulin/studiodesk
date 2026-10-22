@@ -376,17 +376,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // O Supabase persiste a sessão no navegador. Ao recarregar, retomamos a
       // área autenticada sem pedir login novamente.
+      const pendingPlan = sessionStorage.getItem('studiodesk_selected_plan');
+      const hasPendingPlan = ['solo', 'studio', 'empresa', 'agencia', 'individual'].includes(pendingPlan || '');
       if (!event || event === 'INITIAL_SESSION') {
         authDestinationRef.current = null;
         const resumeView = sessionStorage.getItem('studiodesk_resume_view');
-        if (resumeView === 'dashboard') {
+        if (resumeView === 'dashboard' && !hasPendingPlan) {
           sessionStorage.removeItem('studiodesk_resume_view');
           setCurrentView('dashboard');
         } else {
-          setCurrentView(needsOnboarding ? 'profile_select' : 'dashboard');
+          setCurrentView(needsOnboarding || hasPendingPlan ? 'profile_select' : 'dashboard');
         }
       } else if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
-        const destination = authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard');
+        const destination = authDestinationRef.current ?? (needsOnboarding || hasPendingPlan ? 'profile_select' : 'dashboard');
         authDestinationRef.current = null;
         setCurrentView(destination);
       }

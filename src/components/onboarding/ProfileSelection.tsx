@@ -12,10 +12,10 @@ export const ProfileSelection: React.FC = () => {
     const pendingPlan = sessionStorage.getItem('studiodesk_selected_plan') as PlanType | null;
     if (!pendingPlan || !PLANS_LIST.some(plan => plan.id === pendingPlan)) return;
     setPlan(pendingPlan);
-    sessionStorage.removeItem('studiodesk_selected_plan');
   }, [setPlan]);
 
   const handleSelect = (selectedPlan: PlanType) => {
+    sessionStorage.setItem('studiodesk_selected_plan', selectedPlan);
     setPlan(selectedPlan);
     setCurrentView('onboarding');
   };
