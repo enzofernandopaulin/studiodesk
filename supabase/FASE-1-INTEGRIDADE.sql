@@ -58,6 +58,11 @@ begin
     raise exception 'Perfil não encontrado.' using errcode = 'P0001';
   end if;
 
+  update public.workspaces
+  set plan = case when p_plan in ('individual','solo','studio','empresa','agencia') then p_plan else plan end,
+      updated_at = now()
+  where id = wid and owner_id = uid;
+
   if membership_role not in ('admin', 'gestor') then
     raise exception 'Sem permissão para configurar o Kanban.' using errcode = 'P0001';
   end if;

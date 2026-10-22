@@ -2,6 +2,24 @@ begin;
 
 -- A autorização deve respeitar o workspace ativo, não apenas qualquer membership.
 -- Esta migration também remove a policy legada que permitia DML amplo em memberships.
+-- Recria o helper caso a migration 20260907_priority_zero_security não tenha
+-- sido aplicada no ambiente. A assinatura precisa ser exatamente uuid, text[].
+create or replace function public.has_workspace_role(target_workspace uuid, allowed_roles text[])
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.workspace_members wm
+    where wm.workspace_id = target_workspace
+      and wm.user_id = auth.uid()
+      and wm.role = any(allowed_roles)
+  );
+$$;
+
 do $$
 declare t text;
 begin

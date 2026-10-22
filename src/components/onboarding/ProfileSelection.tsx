@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
 import { Check, ArrowRight } from 'lucide-react';
@@ -7,6 +7,13 @@ import { PLANS_LIST } from '../../data/plans';
 
 export const ProfileSelection: React.FC = () => {
   const { setPlan, setCurrentView } = useApp();
+
+  useEffect(() => {
+    const pendingPlan = sessionStorage.getItem('studiodesk_selected_plan') as PlanType | null;
+    if (!pendingPlan || !PLANS_LIST.some(plan => plan.id === pendingPlan)) return;
+    setPlan(pendingPlan);
+    sessionStorage.removeItem('studiodesk_selected_plan');
+  }, [setPlan]);
 
   const handleSelect = (selectedPlan: PlanType) => {
     setPlan(selectedPlan);

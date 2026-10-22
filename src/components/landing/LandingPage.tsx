@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import type { PlanType } from '../../types';
 import { Logo } from '../common/Logo';
 import { 
   ArrowRight, 
@@ -24,7 +25,8 @@ export const LandingPage: React.FC = () => {
   const { setCurrentView } = useApp();
   const [activeTabPreview, setActiveTabPreview] = useState<'kanban' | 'leads' | 'aprovacao' | 'site'>('kanban');
 
-  const handleStartPlan = (_selectedPlan?: unknown) => {
+  const handleStartPlan = (selectedPlan?: PlanType) => {
+    if (selectedPlan) sessionStorage.setItem('studiodesk_selected_plan', selectedPlan);
     setCurrentView('auth');
   };
 
