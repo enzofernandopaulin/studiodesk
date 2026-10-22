@@ -13,9 +13,9 @@ export const ProfileSelection: React.FC = () => {
 
   const handleSelect = async (selectedPlan: PlanType) => {
     setIsSavingPlan(true);
-    setPlan(selectedPlan);
     try {
       await persistSelectedPlan(selectedPlan);
+      setPlan(selectedPlan);
       setRequestedPlan(null);
       setCurrentView('onboarding');
     } catch (error) {

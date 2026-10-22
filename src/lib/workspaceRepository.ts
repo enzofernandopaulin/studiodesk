@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { callServerApi } from './serverApi';
 import {
   UserProfile, Lead, Client, Project, Task, KanbanColumn, TimelineEvent,
   Message, Communication, CalendarEvent, ApprovalRequest, TeamMember,
@@ -219,9 +220,10 @@ export async function completeOnboarding(user: UserProfile, columns: KanbanColum
 }
 
 export async function persistSelectedPlan(plan: UserProfile['plan']): Promise<void> {
-  if (!supabase) throw new Error('Supabase não está configurado.');
-  const { error } = await supabase.rpc('set_studiodesk_plan', { p_plan: plan });
-  if (error) throw error;
+  await callServerApi('/api/session/set-plan', {
+    method: 'POST',
+    body: JSON.stringify({ plan }),
+  });
 }
 
 export async function loadProfile(userId: string): Promise<Partial<UserProfile> | null> {
