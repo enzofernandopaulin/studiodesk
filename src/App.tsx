@@ -37,13 +37,13 @@ const ClientModal = React.lazy(() => import('./components/clients/ClientModal').
 const ProjectModal = React.lazy(() => import('./components/projects/ProjectModal').then(m => ({ default: m.ProjectModal })));
 
 const ViewLoading = () => (
-  <div className="flex min-h-[240px] items-center justify-center text-xs font-bold text-[#6B7280]">
+  <div className="flex min-h-[240px] items-center justify-center text-xs font-bold text-[#6B7280]" role="status" aria-live="polite">
     Carregando módulo...
   </div>
 );
 
 const ViewDataError: React.FC<{ message: string; onRetry: () => void }> = ({ message, onRetry }) => (
-  <div className="flex min-h-[320px] items-center justify-center p-6">
+    <div className="flex min-h-[320px] items-center justify-center p-6" role="alert">
     <div className="w-full max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center">
       <h2 className="text-base font-black text-[#111111]">Não foi possível carregar este módulo</h2>
       <p className="mt-2 text-xs text-[#6B7280]">O restante do workspace continua disponível.</p>
@@ -110,13 +110,13 @@ export const App: React.FC = () => {
   // Não renderiza a landing enquanto o Supabase restaura a sessão. Isso evita
   // o flash visual landing -> dashboard em contas que já estão autenticadas.
   if (!authReady) {
-    return <div className="min-h-screen bg-[#F5F7F9] flex items-center justify-center text-xs font-bold text-[#6B7280]">Carregando seu StudioDesk...</div>;
+    return <div className="min-h-screen bg-[#F5F7F9] flex items-center justify-center text-xs font-bold text-[#6B7280]" role="status" aria-live="polite">Carregando seu StudioDesk...</div>;
   }
 
   if (isAuthenticated && workspaceStatus === 'error') {
     return (
       <div className="min-h-screen bg-[#F5F7F9] flex items-center justify-center p-4">
-        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-xl">
+        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-xl" role="alert">
           <h1 className="text-xl font-black text-[#111111]">Não foi possível carregar seu workspace</h1>
           <p className="mt-2 text-sm text-[#6B7280]">Seus dados não foram apagados nem substituídos.</p>
           <p className="mt-4 rounded-xl bg-red-50 p-3 text-xs font-semibold text-red-700">{workspaceError}</p>
@@ -148,6 +148,7 @@ export const App: React.FC = () => {
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Header
             onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
+            isMobileMenuOpen={isMobileSidebarOpen}
             onOpenQuickCreate={handleOpenQuickCreate}
           />
 

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { getAdminClient } from '../_lib/supabaseAdmin.js';
 import { sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+import { rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
 
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
@@ -16,7 +16,7 @@ export default async function handler(request: any, response: any) {
     const admin = getAdminClient();
     const { data: auth, error: authError } = await admin.auth.getUser(accessToken);
     if (authError || !auth.user) return response.status(401).json({ error: 'Faça login ou crie uma conta para entrar na equipe.' });
-    const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
+    const body = await readJson<{ token?: unknown }>(webRequest);
     const rawToken = typeof body.token === 'string' ? body.token.trim() : '';
     if (!/^[a-f0-9]{64}$/i.test(rawToken)) return response.status(400).json({ error: 'Link de convite inválido.' });
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
@@ -38,6 +38,8 @@ export default async function handler(request: any, response: any) {
   } catch (error) {
     console.error('POST /api/team/join failed', error);
     const message = error instanceof Error ? error.message : '';
+    if (message.includes('Payload muito grande')) return response.status(413).json({ error: message });
+    if (message.includes('Corpo da solicitação') || error instanceof SyntaxError) return response.status(400).json({ error: 'JSON inválido.' });
     if (/accept_workspace_invitation|schema cache|function .* does not exist/i.test(message)) {
       return response.status(503).json({ error: 'Execute supabase/CORRECAO-WORKSPACES-E-CONVITES.sql no Supabase.' });
     }

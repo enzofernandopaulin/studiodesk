@@ -84,3 +84,8 @@ export function verifyHmacSignature(payload: string, signature: string, secret: 
   if (provided.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
 }
+
+export function isFreshWebhookTimestamp(value: string, maxAgeSeconds = 300): boolean {
+  const timestamp = Number(value);
+  return Number.isInteger(timestamp) && Math.abs(Math.floor(Date.now() / 1000) - timestamp) <= maxAgeSeconds;
+}

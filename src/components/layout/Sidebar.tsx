@@ -92,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         id="main-sidebar"
+        aria-label="Navegação principal"
       >
         {/* Brand Header */}
         <div className="p-5 border-b border-[#222222] flex items-center justify-between">
@@ -104,13 +105,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
           <button
             onClick={onCloseMobile}
             className="lg:hidden text-gray-400 hover:text-white p-1 rounded"
+            aria-label="Fechar menu"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation Menu */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1" aria-label="Operação e fluxo">
           <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-gray-400">
             Operação & Fluxo
           </div>
@@ -135,6 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
                     : 'text-gray-300 hover:bg-[#222222] hover:text-white'
                 }`}
                 id={`sidebar-link-${item.id}`}
+                aria-current={isActive ? 'page' : undefined}
               >
                 <div className="flex items-center gap-3">
                   <Icon className={`w-4 h-4 transition-colors ${
@@ -160,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
               </button>
             );
           })}
-        </div>
+        </nav>
 
         {/* Bottom Feature Callout / Plan Status */}
         <div className="p-3 border-t border-[#222222] space-y-2">

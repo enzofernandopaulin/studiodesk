@@ -1,6 +1,6 @@
 import { getAdminClient } from './_lib/supabaseAdmin.js';
 import { sendWebResponse, toWebRequest } from './_lib/http.js';
-import { rateLimit, requireAllowedOrigin } from './_lib/security.js';
+import { rateLimit, readJson, requireAllowedOrigin } from './_lib/security.js';
 
 async function authenticate(request: any) {
   const accessToken = String(request.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
@@ -37,7 +37,7 @@ export default async function handler(request: any, response: any) {
       });
     }
 
-    const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
+    const body = request.method === 'GET' ? {} : await readJson<{ name?: unknown; workspaceId?: unknown }>(webRequest);
     if (request.method === 'POST') {
       const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
       if (!name) return response.status(400).json({ error: 'Informe o nome do novo workspace.' });
@@ -62,6 +62,8 @@ export default async function handler(request: any, response: any) {
   } catch (error) {
     console.error('/api/workspaces failed', error);
     const message = error instanceof Error ? error.message : '';
+    if (message.includes('Payload muito grande')) return response.status(413).json({ error: message });
+    if (message.includes('Corpo da solicitação') || error instanceof SyntaxError) return response.status(400).json({ error: 'JSON inválido.' });
     if (/create_workspace_for_user|schema cache|function .* does not exist/i.test(message)) {
       return response.status(503).json({ error: 'Execute supabase/FASE-1-INTEGRIDADE.sql no Supabase.' });
     }
