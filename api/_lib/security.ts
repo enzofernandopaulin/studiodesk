@@ -32,18 +32,31 @@ export function isAllowedOrigin(request: Request): boolean {
   const origin = request.headers.get('origin');
   if (!origin) return true;
 
-  const allowed = (process.env.APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || '')
-    .split(',')
+  const normalizedOrigin = origin.trim().replace(/\/$/, '');
+  const configured = [
+    process.env.APP_URL,
+    process.env.VERCEL_PROJECT_PRODUCTION_URL,
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+  ]
+    .flatMap(value => String(value || '').split(','))
     .map(value => value.trim().replace(/\/$/, ''))
     .filter(Boolean);
 
+  // Vercel can serve the same production deployment through multiple aliases.
+  // Trust the actual host that received this request as same-origin, then add
+  // only explicitly configured Vercel/system URLs—not arbitrary origins.
+  const host = request.headers.get('host');
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+  const requestOrigin = host ? `${forwardedProto.split(',')[0].trim()}://${host}` : '';
+  const allowed = [...new Set([...configured, requestOrigin].filter(Boolean))];
+
   if (allowed.length === 0) {
-    // Same-origin requests normally omit Origin for GETs. For state-changing browser
-    // requests, require an explicit configured origin in production.
+    // Same-origin requests normally omit Origin for GETs. In production, reject
+    // cross-origin requests when the platform supplied no host/configuration.
     return process.env.VERCEL_ENV !== 'production';
   }
 
-  return allowed.includes(origin.replace(/\/$/, ''));
+  return allowed.includes(normalizedOrigin);
 }
 
 export function requireAllowedOrigin(request: Request): Response | null {
