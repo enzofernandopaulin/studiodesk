@@ -150,7 +150,7 @@ export const FirstAccessChecklist: React.FC<FirstAccessProps> = ({
             </div>
 
             {/* Step 6: Equipe */}
-            {user.plan === 'empresa' && (
+            {['studio', 'empresa', 'agencia'].includes(user.plan) && (
               <div className="p-3.5 bg-[#F5F7F9] hover:bg-blue-50/30 rounded-2xl border border-[#DDE3E8] flex items-center justify-between transition-colors">
                 <div className="flex items-center gap-3">
                   {isTeamInvited ? (
