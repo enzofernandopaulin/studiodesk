@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getWorkspaceId } from './workspaceRepository';
+import { isSafeResourceUrl } from './urlSafety';
 
 export const STORAGE_BUCKET = 'studiodesk-files';
 export const PROFILE_AVATAR_BUCKET = 'studiodesk-avatars';
@@ -69,7 +70,7 @@ export async function uploadWorkspaceFile(userId: string, file: File, category =
 export async function createSignedStorageUrl(reference: string, expiresIn = 3600): Promise<string | null> {
   if (!supabase) return null;
   const parsed = parseStorageReference(reference);
-  if (!parsed) return reference;
+  if (!parsed) return isSafeResourceUrl(reference) ? reference : null;
   const { data, error } = await supabase.storage.from(parsed.bucket).createSignedUrl(parsed.path, expiresIn);
   if (error) throw error;
   return data.signedUrl;

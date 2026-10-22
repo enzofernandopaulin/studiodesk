@@ -25,10 +25,11 @@ import { WorkspaceSwitcher } from '../workspaces/WorkspaceSwitcher';
 
 interface HeaderProps {
   onOpenMobileMenu?: () => void;
+  isMobileMenuOpen?: boolean;
   onOpenQuickCreate: (type: 'lead' | 'client' | 'project' | 'task') => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCreate }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, isMobileMenuOpen = false, onOpenQuickCreate }) => {
   const {
     user,
     user: { plan },
@@ -81,6 +82,8 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, onOpenQuickCre
           onClick={onOpenMobileMenu}
           className="lg:hidden p-2 rounded-lg text-[#111111] hover:bg-[#F5F7F9]"
           aria-label="Abrir Menu"
+          aria-controls="main-sidebar"
+          aria-expanded={isMobileMenuOpen}
         >
           <Menu className="w-5 h-5" />
         </button>

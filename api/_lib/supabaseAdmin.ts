@@ -7,7 +7,7 @@ function cleanEnv(value: string | undefined): string {
 function validSupabaseUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname);
+    return url.protocol === 'https:' && Boolean(url.hostname);
   } catch {
     return false;
   }

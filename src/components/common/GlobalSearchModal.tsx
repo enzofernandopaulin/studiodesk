@@ -91,20 +91,28 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/50 backdrop-blur-xs">
+      <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/50 backdrop-blur-xs" role="presentation" onMouseDown={event => event.target === event.currentTarget && handleClose()}>
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: -10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -10 }}
           className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-[#DDE3E8] overflow-hidden flex flex-col"
           id="global-search-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="global-search-title"
+          onKeyDown={event => { if (event.key === 'Escape') handleClose(); }}
         >
+          <h2 id="global-search-title" className="sr-only">Busca global</h2>
           {/* Search Input Bar */}
           <div className="flex items-center px-4 py-3.5 border-b border-[#DDE3E8] bg-[#F5F7F9]">
             <Search className="w-5 h-5 text-[#66acd7] shrink-0 mr-3" />
             <input
               type="text"
               autoFocus
+              aria-label="Buscar clientes, leads, projetos e tarefas"
+              aria-controls="global-search-results"
+              aria-autocomplete="list"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Buscar clientes, leads, projetos e tarefas..."
@@ -114,6 +122,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
               <button
                 onClick={() => setQuery('')}
                 className="text-[#6B7280] hover:text-[#111111] p-1 rounded"
+                aria-label="Limpar busca"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -127,7 +136,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
           </div>
 
           {/* Results Container */}
-          <div className="max-h-[60vh] overflow-y-auto p-4 space-y-4">
+          <div id="global-search-results" className="max-h-[60vh] overflow-y-auto p-4 space-y-4" aria-live="polite">
             {!query.trim() ? (
               <div className="py-8 text-center text-[#6B7280] text-sm">
                 <p className="font-medium text-[#111111]">Busca Rápida Global</p>
@@ -168,7 +177,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                     </div>
                     <div className="space-y-1.5">
                       {results.clients.map(client => (
-                        <div
+                        <button
                           key={client.id}
                           onClick={() => handleSelectClient(client.id)}
                           className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] cursor-pointer transition-colors border border-transparent hover:border-[#DDE3E8]"
@@ -179,7 +188,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                             <span className="block text-xs text-[#2F6F9C]">{client.segment}</span>
                           </div>
                           <ArrowRight className="w-4 h-4 text-[#6B7280]" />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -194,17 +203,17 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                     </div>
                     <div className="space-y-1.5">
                       {results.projects.map(proj => (
-                        <div
+                        <button
                           key={proj.id}
                           onClick={() => handleSelectProject(proj.id)}
-                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] cursor-pointer transition-colors border border-transparent hover:border-[#DDE3E8]"
+                          className="w-full text-left flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] transition-colors border border-transparent hover:border-[#DDE3E8]"
                         >
                           <div>
                             <span className="font-semibold text-sm text-[#111111]">{proj.title}</span>
                             <span className="text-xs text-[#6B7280] block">Cliente: {proj.clientName} • Status: {proj.status}</span>
                           </div>
                           <ArrowRight className="w-4 h-4 text-[#6B7280]" />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -219,10 +228,10 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                     </div>
                     <div className="space-y-1.5">
                       {results.leads.map(lead => (
-                        <div
+                        <button
                           key={lead.id}
                           onClick={handleSelectLead}
-                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] cursor-pointer transition-colors border border-transparent hover:border-[#DDE3E8]"
+                          className="w-full text-left flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] transition-colors border border-transparent hover:border-[#DDE3E8]"
                         >
                           <div>
                             <span className="font-semibold text-sm text-[#111111]">{lead.name}</span>
@@ -230,7 +239,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                             <span className="block text-xs text-[#8B5CF6]">{lead.serviceInterest}</span>
                           </div>
                           <ArrowRight className="w-4 h-4 text-[#6B7280]" />
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -245,10 +254,10 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                     </div>
                     <div className="space-y-1.5">
                       {results.tasks.map(task => (
-                        <div
+                        <button
                           key={task.id}
                           onClick={handleSelectTask}
-                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] cursor-pointer transition-colors border border-transparent hover:border-[#DDE3E8]"
+                          className="w-full text-left flex items-center justify-between p-2.5 rounded-xl hover:bg-[#F5F7F9] transition-colors border border-transparent hover:border-[#DDE3E8]"
                         >
                           <div>
                             <span className="text-sm text-[#111111]">{task.title}</span>
@@ -259,7 +268,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({ isOpen, on
                           <span className={`text-xs px-2 py-0.5 rounded font-medium ${task.completed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                             {task.completed ? 'Concluída' : 'Pendente'}
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>

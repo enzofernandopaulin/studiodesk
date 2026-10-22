@@ -1,11 +1,9 @@
 import { getAdminClient } from '../_lib/supabaseAdmin.js';
 import { json, methodNotAllowed, sendWebResponse, serverError, toWebRequest } from '../_lib/http.js';
-import { rateLimit, readJson } from '../_lib/security.js';
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { isFreshWebhookTimestamp, rateLimit, readJson, verifyHmacSignature } from '../_lib/security.js';
 
 type Body = { workspaceId?: unknown; name?: unknown; email?: unknown; phone?: unknown; whatsapp?: unknown; company?: unknown; serviceInterest?: unknown; source?: unknown; notes?: unknown; value?: unknown };
 const text = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
-function safeEqual(a: string, b: string) { const aa = createHash('sha256').update(a).digest(); const bb = createHash('sha256').update(b).digest(); return timingSafeEqual(aa, bb); }
 
 async function webHandler(request: Request): Promise<Response> {
   if (request.method !== 'POST') return methodNotAllowed(['POST']);
@@ -13,8 +11,12 @@ async function webHandler(request: Request): Promise<Response> {
   try {
     const expected = process.env.LEADS_WEBHOOK_SECRET;
     if (!expected) return json({ error: 'Webhook de leads não configurado.' }, 503);
-    const supplied = request.headers.get('x-studiodesk-webhook-secret') || new URL(request.url).searchParams.get('token') || '';
-    if (!supplied || !safeEqual(supplied, expected)) return json({ error: 'Webhook não autorizado.' }, 401);
+    const timestamp = request.headers.get('x-studiodesk-webhook-timestamp') || '';
+    const signature = request.headers.get('x-studiodesk-webhook-signature') || '';
+    const rawBody = await request.clone().text();
+    if (!isFreshWebhookTimestamp(timestamp) || !verifyHmacSignature(`${timestamp}.${rawBody}`, signature, expected)) {
+      return json({ error: 'Webhook não autorizado.' }, 401);
+    }
     const body = await readJson<Body>(request);
     const workspaceId = text(body.workspaceId, 80); const name = text(body.name, 160);
     if (!workspaceId || !name) return json({ error: 'workspaceId e name são obrigatórios.' }, 400);

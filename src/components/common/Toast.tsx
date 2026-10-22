@@ -45,6 +45,8 @@ export const ToastContainer: React.FC = () => {
               toast.type
             )}`}
             id={`toast-${toast.id}`}
+            role={toast.type === 'error' ? 'alert' : 'status'}
+            aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
           >
             {getIcon(toast.type)}
             <div className="flex-1 min-w-0">
@@ -55,6 +57,7 @@ export const ToastContainer: React.FC = () => {
               onClick={() => removeToast(toast.id)}
               className="text-[#6B7280] hover:text-[#111111] transition-colors p-1 rounded-md"
               title="Fechar notificação"
+              aria-label="Fechar notificação"
             >
               <X className="w-4 h-4" />
             </button>

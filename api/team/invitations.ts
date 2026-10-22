@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { getAdminClient, getMembership } from '../_lib/supabaseAdmin.js';
 import { sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+import { rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
 
 type Role = 'admin' | 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
@@ -26,7 +26,7 @@ export default async function handler(request: any, response: any) {
 
       if (request.method === 'DELETE') {
         if (actorMembership.role !== 'admin') return response.status(403).json({ error: 'Somente administradores podem remover membros.' });
-        const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
+        const body = await readJson<{ userId?: unknown }>(webRequest);
         const targetUserId = typeof body.userId === 'string' ? body.userId.trim() : '';
         if (!targetUserId) return response.status(400).json({ error: 'Membro inválido.' });
         if (targetUserId === auth.user.id) return response.status(409).json({ error: 'Você não pode remover sua própria conta por esta tela.' });
@@ -123,11 +123,15 @@ export default async function handler(request: any, response: any) {
     const remainingSeats = Math.max(0, planLimit - (membersCount || 0));
     if (remainingSeats === 0) return response.status(409).json({ error: `O Plano ${plan} atingiu o limite de ${planLimit} usuário(s).` });
 
-    const body = typeof request.body === 'string' ? JSON.parse(request.body) : (request.body || {});
+    const body = await readJson<{ teamName?: unknown; role?: unknown }>(webRequest);
     const teamName = typeof body.teamName === 'string' ? body.teamName.trim().slice(0, 120) : '';
-    const role: Role = ['admin','gestor','colaborador'].includes(body.role) ? body.role : 'colaborador';
+    const requestedRole = body.role;
+    const role: Role = requestedRole === 'admin' || requestedRole === 'gestor' || requestedRole === 'colaborador'
+      ? requestedRole
+      : 'colaborador';
     const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
-    if (!appUrl.startsWith('https://')) return response.status(503).json({ error: 'APP_URL não está configurada corretamente.' });
+    const isValidAppUrl = /^https:\/\//i.test(appUrl) || (process.env.VERCEL_ENV !== 'production' && /^http:\/\//i.test(appUrl));
+    if (!isValidAppUrl) return response.status(503).json({ error: 'APP_URL não está configurada corretamente.' });
     if (teamName) {
       const { error: nameError } = await admin.from('workspaces').update({ name: teamName, updated_at: new Date().toISOString() }).eq('id', membership.workspace_id);
       if (nameError) throw nameError;
@@ -154,6 +158,8 @@ export default async function handler(request: any, response: any) {
   } catch (error) {
     console.error(`${request.method} /api/team/invitations failed`, error);
     const message = error instanceof Error ? error.message : '';
+    if (message.includes('Payload muito grande')) return response.status(413).json({ error: message });
+    if (message.includes('Corpo da solicitação') || error instanceof SyntaxError) return response.status(400).json({ error: 'JSON inválido.' });
     if (/remove_workspace_member|function .* does not exist/i.test(message)) {
       return response.status(503).json({ error: 'Execute supabase/EQUIPE-PROFISSIONAL.sql no Supabase.' });
     }
