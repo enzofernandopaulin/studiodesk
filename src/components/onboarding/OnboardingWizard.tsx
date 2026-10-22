@@ -143,7 +143,6 @@ export const OnboardingWizard: React.FC = () => {
       return;
     }
 
-    sessionStorage.removeItem('studiodesk_selected_plan');
     setUser(completedUser);
 
     // 2. Set selected Kanban columns template

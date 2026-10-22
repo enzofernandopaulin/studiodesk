@@ -22,11 +22,11 @@ import {
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
-  const { setCurrentView } = useApp();
+  const { setCurrentView, setRequestedPlan } = useApp();
   const [activeTabPreview, setActiveTabPreview] = useState<'kanban' | 'leads' | 'aprovacao' | 'site'>('kanban');
 
   const handleStartPlan = (selectedPlan?: PlanType) => {
-    if (selectedPlan) sessionStorage.setItem('studiodesk_selected_plan', selectedPlan);
+    setRequestedPlan(selectedPlan ?? null);
     setCurrentView('auth');
   };
 

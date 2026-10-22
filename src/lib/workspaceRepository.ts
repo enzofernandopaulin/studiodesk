@@ -218,6 +218,12 @@ export async function completeOnboarding(user: UserProfile, columns: KanbanColum
   if (error) throw error;
 }
 
+export async function persistSelectedPlan(plan: UserProfile['plan']): Promise<void> {
+  if (!supabase) throw new Error('Supabase não está configurado.');
+  const { error } = await supabase.rpc('set_studiodesk_plan', { p_plan: plan });
+  if (error) throw error;
+}
+
 export async function loadProfile(userId: string): Promise<Partial<UserProfile> | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.from('profiles').select('name,email,role,plan,business_type,team_size,objectives,template,company_name').eq('id', userId).maybeSingle();

@@ -32,6 +32,8 @@ interface AppContextType {
   user: UserProfile;
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
   setPlan: (plan: PlanType) => void;
+  requestedPlan: PlanType | null;
+  setRequestedPlan: (plan: PlanType | null) => void;
   
   // Data lists
   leads: Lead[];
@@ -215,6 +217,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadingDataModulesRef = useRef<Set<DataModule>>(new Set());
 
   const [user, setUserState] = useState<UserProfile>(EMPTY_USER);
+  const [requestedPlan, setRequestedPlan] = useState<PlanType | null>(null);
   const setUser: React.Dispatch<React.SetStateAction<UserProfile>> = (update) => {
     setUserState(prev => {
       const candidate = typeof update === 'function' ? (update as (p: UserProfile) => UserProfile)(prev) : update;
@@ -376,19 +379,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // O Supabase persiste a sessão no navegador. Ao recarregar, retomamos a
       // área autenticada sem pedir login novamente.
-      const pendingPlan = sessionStorage.getItem('studiodesk_selected_plan');
-      const hasPendingPlan = ['solo', 'studio', 'empresa', 'agencia', 'individual'].includes(pendingPlan || '');
       if (!event || event === 'INITIAL_SESSION') {
         authDestinationRef.current = null;
         const resumeView = sessionStorage.getItem('studiodesk_resume_view');
-        if (resumeView === 'dashboard' && !hasPendingPlan) {
+        if (resumeView === 'dashboard') {
           sessionStorage.removeItem('studiodesk_resume_view');
           setCurrentView('dashboard');
         } else {
-          setCurrentView(needsOnboarding || hasPendingPlan ? 'profile_select' : 'dashboard');
+          setCurrentView(needsOnboarding ? 'profile_select' : 'dashboard');
         }
       } else if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
-        const destination = authDestinationRef.current ?? (needsOnboarding || hasPendingPlan ? 'profile_select' : 'dashboard');
+        const destination = authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard');
         authDestinationRef.current = null;
         setCurrentView(destination);
       }
@@ -1329,6 +1330,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user,
         setUser,
         setPlan,
+        requestedPlan,
+        setRequestedPlan,
         leads,
         clients,
         projects,

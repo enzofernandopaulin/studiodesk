@@ -1,24 +1,35 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
 import { Check, ArrowRight } from 'lucide-react';
 import { PlanType } from '../../types';
 import { PLANS_LIST } from '../../data/plans';
+import { persistSelectedPlan } from '../../lib/workspaceRepository';
 
 export const ProfileSelection: React.FC = () => {
-  const { setPlan, setCurrentView } = useApp();
+  const { setPlan, setCurrentView, addToast, requestedPlan, setRequestedPlan } = useApp();
+  const [isSavingPlan, setIsSavingPlan] = useState(false);
+  const attemptedRequestedPlan = useRef<PlanType | null>(null);
+
+  const handleSelect = async (selectedPlan: PlanType) => {
+    setIsSavingPlan(true);
+    setPlan(selectedPlan);
+    try {
+      await persistSelectedPlan(selectedPlan);
+      setRequestedPlan(null);
+      setCurrentView('onboarding');
+    } catch (error) {
+      addToast('error', 'Plano não salvo', error instanceof Error ? error.message : 'Não foi possível salvar o plano escolhido.');
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
 
   useEffect(() => {
-    const pendingPlan = sessionStorage.getItem('studiodesk_selected_plan') as PlanType | null;
-    if (!pendingPlan || !PLANS_LIST.some(plan => plan.id === pendingPlan)) return;
-    setPlan(pendingPlan);
-  }, [setPlan]);
-
-  const handleSelect = (selectedPlan: PlanType) => {
-    sessionStorage.setItem('studiodesk_selected_plan', selectedPlan);
-    setPlan(selectedPlan);
-    setCurrentView('onboarding');
-  };
+    if (!requestedPlan || attemptedRequestedPlan.current === requestedPlan) return;
+    attemptedRequestedPlan.current = requestedPlan;
+    void handleSelect(requestedPlan);
+  }, [requestedPlan]);
 
   return (
     <div className="min-h-screen bg-[#F5F7F9] flex flex-col items-center justify-center p-4 sm:p-8 selection:bg-[#66acd7]/30">
@@ -38,9 +49,9 @@ export const ProfileSelection: React.FC = () => {
             return (
               <div
                 key={p.id}
-                onClick={() => handleSelect(p.id)}
-                className={`p-6 rounded-3xl border-2 transition-all cursor-pointer hover:shadow-xl group flex flex-col justify-between space-y-5 ${
-                  p.id === 'studio'
+                onClick={() => { if (!isSavingPlan) void handleSelect(p.id); }}
+                className={`p-6 rounded-3xl border-2 transition-all ${isSavingPlan ? 'cursor-wait opacity-70' : 'cursor-pointer hover:shadow-xl'} group flex flex-col justify-between space-y-5 ${
+                  p.id === (requestedPlan || 'studio')
                     ? 'bg-[#111111] text-white border-[#66acd7] ring-2 ring-[#66acd7]/30 relative'
                     : 'bg-white text-[#111111] border-[#DDE3E8] hover:border-[#66acd7]'
                 }`}
