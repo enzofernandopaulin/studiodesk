@@ -90,6 +90,12 @@ export default async function handler(request: any, response: any) {
   } catch (error) {
     console.error('POST /api/session/set-plan failed', error);
     const message = error instanceof Error ? error.message : '';
-    return sendWebResponse(json({ error: message || 'Não foi possível salvar o plano escolhido.' }, 500), response);
+    if (/Token de autenticação ausente|Sessão inválida ou expirada/i.test(message)) {
+      return sendWebResponse(json({ error: 'Sessão inválida.' }, 401), response);
+    }
+    if (/Payload muito grande|Corpo da solicitação|JSON inválido/i.test(message)) {
+      return sendWebResponse(json({ error: message }, 400), response);
+    }
+    return sendWebResponse(json({ error: message || 'Não foi possível atualizar o plano.' }, 500), response);
   }
 }
