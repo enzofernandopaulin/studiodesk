@@ -118,7 +118,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
           </div>
 
           {navigationItems.map(item => {
-            if (item.companyOnly && plan !== 'empresa') {
+            // Equipe está disponível em todos os planos com múltiplos usuários.
+            // O plano Agência/Trophy usa o identificador interno "agencia".
+            if (item.companyOnly && !['studio', 'empresa', 'agencia'].includes(plan)) {
               return null;
             }
 
