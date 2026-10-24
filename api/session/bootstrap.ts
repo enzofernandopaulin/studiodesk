@@ -45,9 +45,9 @@ export default async function handler(request: any, response: any) {
       : { data: null, error: null };
     if (activeMembership.error) throw activeMembership.error;
     const active = activeMembership.data || membership;
-    const { data: workspace, error: workspaceError } = await admin.from('workspaces')
-      .select('name').eq('id', active.workspace_id).single();
-    if (workspaceError) throw workspaceError;
+      const { data: workspace, error: workspaceError } = await admin.from('workspaces')
+        .select('name,plan').eq('id', active.workspace_id).single();
+      if (workspaceError) throw workspaceError;
 
     if (!profile) {
       const { error: insertError } = await admin.from('profiles').insert({
@@ -60,17 +60,18 @@ export default async function handler(request: any, response: any) {
         plan: 'individual',
       });
       if (insertError) throw insertError;
-    } else if (profile.workspace_id !== active.workspace_id || profile.company_name !== workspace.name || profile.role !== active.role) {
+    } else if (profile.workspace_id !== active.workspace_id || profile.company_name !== workspace.name || profile.role !== active.role || profile.plan !== workspace.plan) {
       const { error: updateError } = await admin.from('profiles').update({
         workspace_id: active.workspace_id,
         company_name: workspace.name,
         role: active.role,
+        plan: workspace.plan,
         updated_at: new Date().toISOString(),
       }).eq('id', auth.user.id);
       if (updateError) throw updateError;
     }
 
-    return response.status(200).json({ ready: true, workspaceId: active.workspace_id });
+    return response.status(200).json({ ready: true, workspaceId: active.workspace_id, plan: workspace.plan });
   } catch (error) {
     console.error('POST /api/session/bootstrap failed', error);
     const message = error instanceof Error ? error.message : '';

@@ -15,7 +15,10 @@ export const isSupabaseConfigured = Boolean(
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabasePublishableKey!, {
       auth: {
+        // A sessão permanece após recarregar esta aba, mas não é compartilhada
+        // com outras abas/janelas do navegador.
         persistSession: true,
+        storage: window.sessionStorage,
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },

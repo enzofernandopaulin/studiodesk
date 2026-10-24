@@ -257,7 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
-      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string }>('/api/session/bootstrap', { method: 'POST' });
+      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string; plan?: UserProfile['plan'] }>('/api/session/bootstrap', { method: 'POST' });
       const [profile, workspace, canonicalTeam, avatarUrl] = await Promise.all([
         loadProfile(userId),
         loadWorkspace(bootstrap.workspaceId),
@@ -279,6 +279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         id: userId,
         ...profile,
+        ...(bootstrap.plan ? { plan: bootstrap.plan } : {}),
         avatar: avatarUrl ?? '',
       }));
 

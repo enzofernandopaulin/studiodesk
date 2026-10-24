@@ -198,25 +198,20 @@ export async function loadWorkspacePatch(
 }
 
 export async function completeOnboarding(user: UserProfile, columns: KanbanColumn[]): Promise<void> {
-  if (!supabase) throw new Error('Supabase não está configurado.');
   if (!user.id) throw new Error('Usuário autenticado não encontrado.');
-  const { error } = await supabase.rpc('complete_studiodesk_onboarding', {
-    p_name: user.name,
-    // A foto é armazenada no bucket studiodesk-avatars, nunca em profiles.
-    p_avatar: '',
-    p_plan: user.plan,
-    p_business_type: user.businessType,
-    p_team_size: user.teamSize,
-    p_objectives: user.objectives,
-    p_template: user.template,
-    p_columns: columns.map(column => ({
-      id: column.id,
-      title: column.title,
-      color: column.color,
-      order: column.order,
-    })),
+  await callServerApi('/api/session/complete-onboarding', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: user.name,
+      avatar: user.avatar,
+      plan: user.plan,
+      businessType: user.businessType,
+      teamSize: user.teamSize,
+      objectives: user.objectives,
+      template: user.template,
+      columns: columns.map(column => ({ id: column.id, title: column.title, color: column.color, order: column.order })),
+    }),
   });
-  if (error) throw error;
 }
 
 export async function persistSelectedPlan(plan: UserProfile['plan']): Promise<void> {
