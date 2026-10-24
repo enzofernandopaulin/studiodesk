@@ -199,9 +199,10 @@ export async function loadWorkspacePatch(
 
 export async function completeOnboarding(user: UserProfile, columns: KanbanColumn[]): Promise<void> {
   if (!user.id) throw new Error('Usuário autenticado não encontrado.');
-  await callServerApi('/api/session/complete-onboarding', {
+  await callServerApi('/api/session/set-plan', {
     method: 'POST',
     body: JSON.stringify({
+      mode: 'complete-onboarding',
       name: user.name,
       avatar: user.avatar,
       plan: user.plan,
