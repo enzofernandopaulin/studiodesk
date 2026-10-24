@@ -68,7 +68,7 @@ export const LandingPage: React.FC = () => {
               Entrar
             </button>
             <button
-              onClick={() => handleStartPlan('empresa')}
+              onClick={() => handleStartPlan()}
               className="bg-[#111111] hover:bg-[#2F6F9C] text-white text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-1.5"
               id="landing-cta-top"
             >
@@ -101,7 +101,7 @@ export const LandingPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
-              onClick={() => handleStartPlan('empresa')}
+              onClick={() => handleStartPlan()}
               className="w-full sm:w-auto bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-base px-8 py-4 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 group"
               id="hero-cta-start"
             >
