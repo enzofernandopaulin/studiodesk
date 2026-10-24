@@ -58,6 +58,12 @@ set role = case when role = 'admin' then 'admin' when role = 'gestor' then 'gest
     max_uses = greatest(1, least(coalesce(max_uses, 25), 50)),
     uses_count = greatest(0, coalesce(uses_count, 0));
 
+-- Versões antigas restringiam links a gestor/colaborador e bloqueavam admin.
+alter table public.workspace_invitations
+  drop constraint if exists workspace_invitations_link_role_check;
+alter table public.workspace_invitations
+  drop constraint if exists workspace_invitations_role_check;
+
 do $$
 begin
   if not exists (
