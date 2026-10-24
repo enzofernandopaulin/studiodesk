@@ -1,7 +1,6 @@
 export type PlanType = 'solo' | 'studio' | 'empresa' | 'agencia' | 'individual';
 
-export type UserRole = 'admin' | 'gestor' | 'colaborador';
-
+export type UserRole = 'admin' | 'gestor' | 'colaborador' | 'cliente';
 export interface UserProfile {
   id: string;
   name: string;
@@ -14,6 +13,7 @@ export interface UserProfile {
   objectives: string[];
   template: string;
   companyName: string;
+  clientId?: string;
 }
 
 export type LeadStatus = 'novo' | 'em_contato' | 'qualificado' | 'proposta' | 'convertido' | 'perdido';
@@ -254,6 +254,7 @@ export type ActiveView =
   | 'profile_select'
   | 'onboarding'
   | 'first_access'
+  | 'client_portal'
   | 'dashboard'
   | 'leads'
   | 'clients'

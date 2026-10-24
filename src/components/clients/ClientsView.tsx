@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Client } from '../../types';
-import { Users, Plus, Search, Mail, MessageSquare, FolderKanban, Trash2, Edit, ArrowRight } from 'lucide-react';
+import { Users, Plus, Search, Mail, MessageSquare, FolderKanban, Trash2, Edit, ArrowRight, Link2 } from 'lucide-react';
 import { ClientModal } from './ClientModal';
 import { EmptyState } from '../common/EmptyState';
+import { callServerApi } from '../../lib/serverApi';
 
 export const ClientsView: React.FC = () => {
-  const { clients, deleteClient, setSelectedClientId, setCurrentView, projects } = useApp();
+  const { clients, deleteClient, setSelectedClientId, setCurrentView, projects, addToast, user } = useApp();
   const [activeFilter, setActiveFilter] = useState<'todos' | 'ativo' | 'inativo'>('todos');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -40,6 +41,18 @@ export const ClientsView: React.FC = () => {
   const handleDelete = (e: React.MouseEvent, clientId: string) => {
     e.stopPropagation();
     deleteClient(clientId);
+  };
+
+  const handleInvite = async (e: React.MouseEvent, client: Client) => {
+    e.stopPropagation();
+    if (user.role !== 'admin') return;
+    try {
+      const result = await callServerApi<{ inviteUrl: string }>('/api/team/invitations?resource=client', { method: 'POST', body: JSON.stringify({ clientId: client.id }) });
+      await navigator.clipboard.writeText(result.inviteUrl);
+      addToast('success', 'Convite do portal copiado', 'Envie o link ao cliente. Ele expira em 7 dias.');
+    } catch (error) {
+      addToast('error', 'Convite não criado', error instanceof Error ? error.message : 'Tente novamente.');
+    }
   };
 
   return (
@@ -191,6 +204,7 @@ export const ClientsView: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-1">
+                    {user.role === 'admin' && <button onClick={(e) => void handleInvite(e, client)} className="p-1.5 text-[#2F6F9C] hover:text-[#111111] rounded-lg hover:bg-[#E8F4FA]" title="Copiar convite do portal do cliente"><Link2 className="w-3.5 h-3.5" /></button>}
                     <button
                       onClick={(e) => handleOpenEdit(e, client)}
                       className="p-1.5 text-[#6B7280] hover:text-[#111111] rounded-lg hover:bg-[#F5F7F9]"

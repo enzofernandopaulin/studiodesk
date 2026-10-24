@@ -17,6 +17,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   // Mirrors the database RLS: collaborators can operate tasks and communication,
   // while CRM, calendar and approval mutations require a manager or admin.
   colaborador: ['manage:tasks','manage:communication']
+  ,cliente: []
 };
 
 export const can = (role: UserRole, permission: Permission) => rolePermissions[role]?.includes(permission) ?? false;

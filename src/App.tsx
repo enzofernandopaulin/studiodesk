@@ -7,6 +7,7 @@ import { ProfileSelection } from './components/onboarding/ProfileSelection';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { FirstAccessChecklist } from './components/onboarding/FirstAccessChecklist';
 import { TeamInviteJoin } from './components/team/TeamInviteJoin';
+import { ClientInviteJoin } from './components/client-portal/ClientInviteJoin';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
 import { ToastContainer } from './components/common/Toast';
@@ -31,6 +32,7 @@ const CommunicationHubView = React.lazy(() => import('./components/communication
 const IntegrationsView = React.lazy(() => import('./components/integrations/IntegrationsView').then(m => ({ default: m.IntegrationsView })));
 const TeamView = React.lazy(() => import('./components/team/TeamView').then(m => ({ default: m.TeamView })));
 const SettingsView = React.lazy(() => import('./components/settings/SettingsView').then(m => ({ default: m.SettingsView })));
+const ClientPortalView = React.lazy(() => import('./components/client-portal/ClientPortalView').then(m => ({ default: m.ClientPortalView })));
 const GlobalSearchModal = React.lazy(() => import('./components/common/GlobalSearchModal').then(m => ({ default: m.GlobalSearchModal })));
 const LeadModal = React.lazy(() => import('./components/leads/LeadModal').then(m => ({ default: m.LeadModal })));
 const ClientModal = React.lazy(() => import('./components/clients/ClientModal').then(m => ({ default: m.ClientModal })));
@@ -77,6 +79,10 @@ export const App: React.FC = () => {
       return;
     }
     if (!isAuthenticated) return;
+    if (user.role === 'cliente' && currentView !== 'client_portal') {
+      setCurrentView('client_portal');
+      return;
+    }
     // A sessão restaurada pelo Supabase permanece autenticada após recarregar.
     const permission = viewPermission[currentView];
     if (permission && !can(permission)) setCurrentView('dashboard');
@@ -135,9 +141,10 @@ export const App: React.FC = () => {
           onOpenProjectModal={() => setIsProjectModalOpen(true)}
         />
       )}
+      {isAuthenticated && currentView === 'client_portal' && <React.Suspense fallback={<ViewLoading />}><ClientPortalView /></React.Suspense>}
 
       {/* 2. AUTHENTICATED APP WORKSPACE (Header + Sidebar + Content) */}
-      {!isPublicOrOnboarding && isAuthenticated && (
+      {!isPublicOrOnboarding && currentView !== 'client_portal' && isAuthenticated && user.role !== 'cliente' && (
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Header
             onOpenMobileMenu={() => setIsMobileSidebarOpen(true)}
@@ -201,6 +208,7 @@ export const App: React.FC = () => {
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       <InvitePasswordSetup />
       <TeamInviteJoin />
+      <ClientInviteJoin />
 
       <LeadModal
         isOpen={isLeadModalOpen}

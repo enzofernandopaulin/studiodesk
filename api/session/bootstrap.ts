@@ -1,6 +1,7 @@
 import { getAdminClient } from '../_lib/supabaseAdmin.js';
 import { sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+import { rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
+import { createHash } from 'node:crypto';
 
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
@@ -17,9 +18,31 @@ export default async function handler(request: any, response: any) {
     const { data: auth, error: authError } = await admin.auth.getUser(accessToken);
     if (authError || !auth.user) return response.status(401).json({ error: 'Sessão inválida.' });
 
+    const body = request.method === 'POST' ? await readJson<{ clientToken?: unknown }>(webRequest) : {};
+    const clientToken = typeof body.clientToken === 'string' ? body.clientToken.trim() : '';
+
     const { data: profile, error: profileError } = await admin.from('profiles')
-      .select('id,workspace_id,plan,name,email,company_name,role').eq('id', auth.user.id).maybeSingle();
+      .select('id,workspace_id,plan,name,email,company_name,role,client_id').eq('id', auth.user.id).maybeSingle();
     if (profileError) throw profileError;
+
+    if (/^[a-f0-9]{64}$/i.test(clientToken) && profile?.role !== 'cliente') {
+      const tokenHash = createHash('sha256').update(clientToken).digest('hex');
+      const { data: invitation, error: invitationError } = await admin.from('client_portal_invitations')
+        .select('id,workspace_id,client_id,expires_at,max_uses,uses_count').eq('token_hash', tokenHash).maybeSingle();
+      if (invitationError) throw invitationError;
+      if (!invitation) return response.status(404).json({ error: 'Convite do portal não encontrado.' });
+      if (invitation.uses_count >= invitation.max_uses || new Date(invitation.expires_at).getTime() < Date.now()) return response.status(410).json({ error: 'O convite do portal expirou ou já foi utilizado.' });
+      const { data: existingMembership } = await admin.from('workspace_members').select('workspace_id,role').eq('workspace_id', invitation.workspace_id).eq('user_id', auth.user.id).maybeSingle();
+      if (existingMembership && existingMembership.role !== 'cliente') return response.status(409).json({ error: 'Esta conta já pertence à equipe administrativa deste workspace.' });
+      if (!existingMembership) {
+        const { error: memberError } = await admin.from('workspace_members').insert({ workspace_id: invitation.workspace_id, user_id: auth.user.id, role: 'cliente' });
+        if (memberError) throw memberError;
+      }
+      const { error: profileUpdateError } = await admin.from('profiles').update({ workspace_id: invitation.workspace_id, client_id: invitation.client_id, role: 'cliente', updated_at: new Date().toISOString() }).eq('id', auth.user.id);
+      if (profileUpdateError) throw profileUpdateError;
+      const { error: inviteUpdateError } = await admin.from('client_portal_invitations').update({ uses_count: invitation.uses_count + 1, accepted_by: auth.user.id, accepted_at: new Date().toISOString() }).eq('id', invitation.id);
+      if (inviteUpdateError) throw inviteUpdateError;
+    }
 
     const { data: memberships, error: membershipsError } = await admin.from('workspace_members')
       .select('workspace_id,role,created_at').eq('user_id', auth.user.id).order('created_at').limit(1);
@@ -71,7 +94,7 @@ export default async function handler(request: any, response: any) {
       if (updateError) throw updateError;
     }
 
-    return response.status(200).json({ ready: true, workspaceId: active.workspace_id, plan: workspace.plan });
+    return response.status(200).json({ ready: true, workspaceId: active.workspace_id, plan: workspace.plan, role: active.role, clientId: profile?.client_id || null });
   } catch (error) {
     console.error('POST /api/session/bootstrap failed', error);
     const message = error instanceof Error ? error.message : '';

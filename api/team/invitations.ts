@@ -16,6 +16,23 @@ export default async function handler(request: any, response: any) {
   try {
     const resource = Array.isArray(request.query?.resource) ? request.query.resource[0] : request.query?.resource;
 
+    if (resource === 'client' && request.method === 'GET') {
+      const rawQueryToken = Array.isArray(request.query?.token) ? request.query.token[0] : request.query?.token;
+      const rawToken = typeof rawQueryToken === 'string' ? rawQueryToken.trim() : '';
+      if (!/^[a-f0-9]{64}$/i.test(rawToken)) return response.status(400).json({ error: 'Link de portal inválido.' });
+      const admin = getAdminClient();
+      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+      const { data: invitation, error } = await admin.from('client_portal_invitations').select('workspace_id,client_id,expires_at,max_uses,uses_count').eq('token_hash', tokenHash).maybeSingle();
+      if (error || !invitation) return response.status(404).json({ error: 'Convite de cliente não encontrado.' });
+      if (invitation.uses_count >= invitation.max_uses) return response.status(409).json({ error: 'Este convite já foi utilizado.' });
+      if (new Date(invitation.expires_at).getTime() < Date.now()) return response.status(410).json({ error: 'Este convite expirou.' });
+      const [{ data: workspace }, { data: client }] = await Promise.all([
+        admin.from('workspaces').select('name').eq('id', invitation.workspace_id).single(),
+        admin.from('clients').select('name,company,email').eq('workspace_id', invitation.workspace_id).eq('id', invitation.client_id).single(),
+      ]);
+      return response.status(200).json({ workspaceName: workspace?.name || 'Agência', clientName: client?.company || client?.name || 'Cliente', emailRestricted: Boolean(client?.email), expiresAt: invitation.expires_at });
+    }
+
     if (resource === 'members' && (request.method === 'GET' || request.method === 'DELETE')) {
       const accessToken = String(request.headers?.authorization || '').replace(/^Bearer\s+/i, '').trim();
       const admin = getAdminClient();
@@ -114,6 +131,22 @@ export default async function handler(request: any, response: any) {
     const membership = await getMembership(admin, auth.user.id);
     if (!membership || membership.role !== 'admin') return response.status(403).json({ error: 'Somente administradores podem criar convites.' });
 
+    if (resource === 'client') {
+      const body = await readJson<{ clientId?: unknown }>(webRequest);
+      const clientId = typeof body.clientId === 'string' ? body.clientId.trim() : '';
+      if (!clientId) return response.status(400).json({ error: 'Cliente inválido.' });
+      const { data: client, error: clientError } = await admin.from('clients').select('id,email').eq('workspace_id', membership.workspace_id).eq('id', clientId).maybeSingle();
+      if (clientError) throw clientError;
+      if (!client) return response.status(404).json({ error: 'Cliente não encontrado neste workspace.' });
+      const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
+      if (!/^https:\/\//i.test(appUrl)) return response.status(503).json({ error: 'APP_URL não está configurada corretamente.' });
+      const rawToken = randomBytes(32).toString('hex');
+      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+      const { error: insertError } = await admin.from('client_portal_invitations').insert({ workspace_id: membership.workspace_id, client_id: clientId, token_hash: tokenHash, email: client.email || null, created_by: auth.user.id });
+      if (insertError) throw insertError;
+      return response.status(201).json({ inviteUrl: `${appUrl}/?client_invite=${rawToken}`, expiresInDays: 7 });
+    }
+
     const { data: workspacePlan, error: planLookupError } = await admin.from('workspaces').select('name,plan').eq('id', membership.workspace_id).single();
     if (planLookupError) throw planLookupError;
     const plan = workspacePlan?.plan || 'individual';
@@ -149,6 +182,7 @@ export default async function handler(request: any, response: any) {
       max_uses: remainingSeats,
     });
     if (insertError) {
+      if (/client_portal_invitations/i.test(insertError.message)) return response.status(503).json({ error: 'Execute supabase/migrations/20261024_client_portal_access.sql no Supabase antes de criar convites de clientes.' });
       if (/workspace_invitations/i.test(insertError.message)) return response.status(503).json({ error: 'Execute supabase/CORRECAO-WORKSPACES-E-CONVITES.sql no Supabase antes de criar convites.' });
       throw insertError;
     }

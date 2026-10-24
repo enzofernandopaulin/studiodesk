@@ -257,7 +257,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Contas antigas ou criadas antes dos triggers atuais são reparadas
       // no servidor antes de qualquer consulta protegida por workspace.
-      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string; plan?: UserProfile['plan'] }>('/api/session/bootstrap', { method: 'POST' });
+      const clientToken = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('client_invite') : null;
+      const bootstrap = await callServerApi<{ ready: boolean; workspaceId: string; plan?: UserProfile['plan']; role?: UserProfile['role']; clientId?: string | null }>('/api/session/bootstrap', {
+        method: 'POST',
+        body: JSON.stringify(clientToken ? { clientToken } : {}),
+      });
       const [profile, workspace, canonicalTeam, avatarUrl] = await Promise.all([
         loadProfile(userId),
         loadWorkspace(bootstrap.workspaceId),
@@ -315,7 +319,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsHydrated(true);
       const hasBusinessData = workspace.leads.length > 0 || workspace.clients.length > 0 || workspace.projects.length > 0 || workspace.tasks.length > 0;
       setWorkspaceStatus(hasBusinessData ? 'ready' : 'empty');
-      return !profile.businessType || !profile.teamSize;
+      return profile.role === 'cliente' ? 'client' : (!profile.businessType || !profile.teamSize);
     } catch (error) {
       console.error('StudioDesk: falha ao carregar dados do Supabase', error);
       const message = error instanceof Error ? error.message : 'Não foi possível carregar seu workspace.';
@@ -383,14 +387,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!event || event === 'INITIAL_SESSION') {
         authDestinationRef.current = null;
         const resumeView = sessionStorage.getItem('studiodesk_resume_view');
-        if (resumeView === 'dashboard') {
+        if (needsOnboarding === 'client') {
+          setCurrentView('client_portal');
+        } else if (resumeView === 'dashboard') {
           sessionStorage.removeItem('studiodesk_resume_view');
           setCurrentView('dashboard');
         } else {
           setCurrentView(needsOnboarding ? 'profile_select' : 'dashboard');
         }
       } else if (event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') {
-        const destination = authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard');
+        const destination = needsOnboarding === 'client' ? 'client_portal' : (authDestinationRef.current ?? (needsOnboarding ? 'profile_select' : 'dashboard'));
         authDestinationRef.current = null;
         setCurrentView(destination);
       }
@@ -423,7 +429,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuthReady(false);
     const needsOnboarding = await loadAuthenticatedData(authUserId);
     setAuthReady(true);
-    if (needsOnboarding === true) setCurrentView('profile_select');
+    if (needsOnboarding === 'client') setCurrentView('client_portal');
+    else if (needsOnboarding === true) setCurrentView('profile_select');
     else if (needsOnboarding === false) setCurrentView('dashboard');
   };
 
@@ -626,7 +633,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { error: 'Login confirmado, mas não foi possível carregar seu workspace. Use a opção de tentar novamente.' };
     }
 
-    setCurrentView(needsOnboarding ? 'profile_select' : 'dashboard');
+    setCurrentView(needsOnboarding === 'client' ? 'client_portal' : (needsOnboarding ? 'profile_select' : 'dashboard'));
     return {};
   };
 

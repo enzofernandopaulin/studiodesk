@@ -224,7 +224,7 @@ export async function persistSelectedPlan(plan: UserProfile['plan']): Promise<vo
 
 export async function loadProfile(userId: string): Promise<Partial<UserProfile> | null> {
   if (!supabase) return null;
-  const { data, error } = await supabase.from('profiles').select('name,email,role,plan,business_type,team_size,objectives,template,company_name').eq('id', userId).maybeSingle();
+  const { data, error } = await supabase.from('profiles').select('name,email,role,plan,business_type,team_size,objectives,template,company_name,client_id').eq('id', userId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
   return { id:userId,name:data.name,email:data.email,role:data.role,plan:data.plan,businessType:data.business_type,teamSize:data.team_size,objectives:data.objectives ?? [],template:data.template,companyName:data.company_name };
