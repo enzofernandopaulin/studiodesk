@@ -78,9 +78,10 @@ A migração desta branch está em:
 Antes de aplicar em staging:
 1. Fazer backup apropriado.
 2. Conferir se a tabela `public.leads` possui as colunas esperadas pelo handler (`workspace_id`, `idempotency_key`, `name`, `company`, `email`, `phone`, `whatsapp`, `source`, `service_interest`, `assigned_to`, `notes`, `status`, `value`, `created_at`).
-3. Verificar as políticas RLS atuais e o isolamento entre workspaces. Alterações em `supabase/schema.sql` não são aplicadas automaticamente ao banco existente.
-4. Aplicar a migração somente em staging e verificar a coluna e o índice único parcial `leads_workspace_idempotency_key_uidx`.
-5. Repetir em produção apenas depois da aprovação dos testes.
+3. Executar o diagnóstico somente de leitura `supabase/diagnostics/verify_leads_rls.sql` e revisar colunas, RLS, políticas e duplicidades. Esse diagnóstico não altera o banco.
+4. A migração de idempotência não corrige políticas RLS. Alterações em `supabase/schema.sql` não são aplicadas automaticamente ao banco existente; qualquer correção de RLS deve ser preparada em migração separada após revisar as políticas reais.
+5. Aplicar `supabase/migrations/20261025_lead_webhook_idempotency.sql` somente em staging e verificar a coluna e o índice único parcial `leads_workspace_idempotency_key_uidx`.
+6. Repetir em produção apenas depois da aprovação dos testes.
 
 ## Testes necessários antes de produção
 
