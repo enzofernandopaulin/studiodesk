@@ -79,7 +79,7 @@ Antes de aplicar em staging:
 1. Fazer backup apropriado.
 2. Conferir se a tabela `public.leads` possui as colunas esperadas pelo handler (`workspace_id`, `idempotency_key`, `name`, `company`, `email`, `phone`, `whatsapp`, `source`, `service_interest`, `assigned_to`, `notes`, `status`, `value`, `created_at`).
 3. Verificar as políticas RLS atuais e o isolamento entre workspaces. Alterações em `supabase/schema.sql` não são aplicadas automaticamente ao banco existente.
-4. Aplicar a migração somente em staging e verificar a coluna e o índice único parcial `leads_workspace_idempotency_key_uidx).
+4. Aplicar a migração somente em staging e verificar a coluna e o índice único parcial `leads_workspace_idempotency_key_uidx`.
 5. Repetir em produção apenas depois da aprovação dos testes.
 
 ## Testes necessários antes de produção
