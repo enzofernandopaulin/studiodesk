@@ -3,10 +3,12 @@ import { json } from './http.js';
 const LUA = "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]); end; return n";
 
 function clientIp(request: Request): string {
-  return (request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown')
-    .split(',')[0]
-    .trim()
-    .slice(0, 100);
+  // x-real-ip é fornecido pela plataforma. Evite confiar no primeiro valor de
+  // x-forwarded-for, que pode conter um valor enviado pelo cliente.
+  const trusted = request.headers.get('x-real-ip');
+  const forwarded = request.headers.get('x-forwarded-for');
+  const candidate = trusted || (forwarded ? forwarded.split(',').at(-1) : '') || 'unknown';
+  return candidate.trim().slice(0, 100);
 }
 
 export async function distributedRateLimit(
