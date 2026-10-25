@@ -25,7 +25,7 @@ export interface Lead {
   email: string;
   phone: string;
   whatsapp: string;
-  source: 'Site Institucional' | 'Instagram' | 'Indicação' | 'WhatsApp Direto' | 'Google' | 'Outro';
+  source: 'Site Institucional' | 'Site Institucional (Formulário)' | 'Instagram' | 'Indicação' | 'WhatsApp Direto' | 'Google' | 'Outro';
   serviceInterest: string;
   assignedTo: string;
   notes: string;

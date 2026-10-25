@@ -17,7 +17,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({ isOpen, onClose, leadToEdi
   const [email, setEmail] = useState(leadToEdit?.email || '');
   const [phone, setPhone] = useState(leadToEdit?.phone || '');
   const [whatsapp, setWhatsapp] = useState(leadToEdit?.whatsapp || '');
-  const [source, setSource] = useState<Lead['source']>(leadToEdit?.source || 'Site Institucional');
+  const [source, setSource] = useState<Lead['source']>(leadToEdit?.source || 'Site Institucional (Formulário)');
   const [serviceInterest, setServiceInterest] = useState(leadToEdit?.serviceInterest || 'Vídeo Institucional & Produção');
   const [assignedTo, setAssignedTo] = useState(leadToEdit?.assignedTo || user.name);
   const [notes, setNotes] = useState(leadToEdit?.notes || '');
@@ -153,7 +153,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({ isOpen, onClose, leadToEdi
                 onChange={e => setSource(e.target.value as Lead['source'])}
                 className="w-full px-3 py-2 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none"
               >
-                <option value="Site Institucional">Site Institucional (Formulário)</option>
+                <option value="Site Institucional (Formulário)">Site Institucional (Formulário)</option>
                 <option value="Instagram">Instagram</option>
                 <option value="WhatsApp Direto">WhatsApp Direto</option>
                 <option value="Indicação">Indicação</option>

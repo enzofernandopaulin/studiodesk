@@ -67,6 +67,7 @@ create table if not exists public.profiles (
 create table if not exists public.leads (
   id text not null,
   workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  idempotency_key text,
   name text not null,
   company text not null default '',
   email text not null default '',
@@ -320,6 +321,9 @@ create table if not exists public.integrations (
 -- ÍNDICES
 -- ============================================================
 create index if not exists leads_workspace_status_idx on public.leads(workspace_id, status);
+create unique index if not exists leads_workspace_idempotency_key_uidx
+  on public.leads(workspace_id, idempotency_key)
+  where idempotency_key is not null;
 create index if not exists clients_workspace_status_idx on public.clients(workspace_id, status);
 create index if not exists projects_workspace_column_idx on public.projects(workspace_id, column_id);
 create index if not exists tasks_workspace_deadline_idx on public.tasks(workspace_id, deadline);
