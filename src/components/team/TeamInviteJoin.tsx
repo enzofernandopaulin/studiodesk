@@ -34,7 +34,7 @@ export const TeamInviteJoin: React.FC = () => {
   const [loadingPreview, setLoadingPreview] = useState(Boolean(token));
   const [working, setWorking] = useState(false);
   const [error, setError] = useState('');
-  const onboardingComplete = Boolean(user.businessType?.trim() && user.teamSize?.trim() && user.template?.trim());
+  const onboardingComplete = Boolean(user.template?.trim());
   const onboardingInProgress = currentView === 'profile_select' || currentView === 'onboarding';
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export const TeamInviteJoin: React.FC = () => {
     return <div className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-[#111111] px-4 py-3 text-center text-xs font-bold text-white"><Users className="h-4 w-4 text-[#66acd7]" />Faça login ou crie uma conta. Depois você poderá escolher se entra na equipe.</div>;
   }
   if (!onboardingComplete) {
-    return <div className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-[#111111] px-4 py-3 text-center text-xs font-bold text-white"><Users className="h-4 w-4 text-[#66acd7]" />Conclua os 6 passos iniciais. Seu convite ficará reservado para a escolha do workspace.</div>;
+    return <div className="fixed inset-x-0 top-0 z-[110] flex items-center justify-center gap-2 bg-[#111111] px-4 py-3 text-center text-xs font-bold text-white"><Users className="h-4 w-4 text-[#66acd7]" />Conclua a configuração inicial. Seu convite ficará reservado para a escolha do workspace.</div>;
   }
 
   const keepCurrent = () => {
