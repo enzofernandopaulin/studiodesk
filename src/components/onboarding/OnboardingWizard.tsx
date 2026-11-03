@@ -3,29 +3,30 @@ import { useApp } from '../../context/AppContext';
 import { completeOnboarding } from '../../lib/workspaceRepository';
 import { uploadProfileAvatar } from '../../lib/storageRepository';
 import { Logo } from '../common/Logo';
-import { ArrowRight, ArrowLeft, Check, User, Mail, Image as ImageIcon, Building2, Film, Megaphone, Share2, Laptop, Sparkles, Layers } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, User, Mail, Image as ImageIcon, Building2, Film, Megaphone, Share2, Laptop, Sparkles, Layers, Plus, Trash2 } from 'lucide-react';
+import { getPlanDetails } from '../../data/plans';
+import type { KanbanColumn } from '../../types';
 
 export const OnboardingWizard: React.FC = () => {
-  const { user, setUser, setCurrentView, addToast, setKanbanColumns } = useApp();
+  const { user, setUser, setCurrentView, addToast, setKanbanColumns, kanbanColumns } = useApp();
   const [step, setStep] = useState(1);
   const [isFinishing, setIsFinishing] = useState(false);
 
   // Form states initialized with current user profile
   const [name, setName] = useState(user.name || '');
-  const [email, setEmail] = useState(user.email || '');
   const [avatar, setAvatar] = useState(user.avatar || '');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [businessType, setBusinessType] = useState(user.businessType || 'Agência');
-  const [teamSize, setTeamSize] = useState(user.teamSize || (user.plan === 'individual' ? '1' : '6–10'));
-  const [objectives, setObjectives] = useState<string[]>(user.objectives || [
-    'Organizar clientes',
-    'Gerenciar projetos',
-    'Usar Kanban',
-    'Captar leads',
-    'Integrar meu site',
-    'Centralizar comunicação'
-  ]);
   const [template, setTemplate] = useState(user.template || 'Audiovisual');
+  const [customColumns, setCustomColumns] = useState<KanbanColumn[]>(() => (
+    user.template === 'Personalizado' && kanbanColumns.length
+      ? kanbanColumns.map(column => ({ ...column }))
+      : [
+          { id: 'custom_1', title: 'A FAZER', color: '#66acd7', order: 0 },
+          { id: 'custom_2', title: 'EM ANDAMENTO', color: '#2F6F9C', order: 1 },
+          { id: 'custom_3', title: 'CONCLUÍDO', color: '#10B981', order: 2 },
+        ]
+  ));
 
   const businessTypes = [
     { label: 'Agência', icon: Building2, desc: 'Agência de marketing ou publicidade' },
@@ -34,18 +35,6 @@ export const OnboardingWizard: React.FC = () => {
     { label: 'Social Media', icon: Share2, desc: 'Criação e gestão de conteúdo' },
     { label: 'Freelancer', icon: Laptop, desc: 'Profissional independente / criativo' },
     { label: 'Outro', icon: Sparkles, desc: 'Outros segmentos de serviços' }
-  ];
-
-  const teamSizes = ['1', '2–5', '6–10', '10+'];
-
-  const allObjectives = [
-    { id: 'clientes', label: 'Organizar clientes', desc: 'Centralizar histórico e dados de contato' },
-    { id: 'projetos', label: 'Gerenciar projetos', desc: 'Acompanhar prazos e entregas' },
-    { id: 'kanban', label: 'Usar Kanban', desc: 'Visualizar produção em colunas de status' },
-    { id: 'leads', label: 'Captar leads', desc: 'Receber oportunidades do formulário do site' },
-    { id: 'site', label: 'Integrar meu site', desc: 'Conectar vitrine digital ao fluxo do CRM' },
-    { id: 'equipe', label: 'Organizar equipe', desc: 'Atribuir responsáveis e tarefas' },
-    { id: 'comunicacao', label: 'Centralizar comunicação', desc: 'Evitar mensagens e áudios soltos' }
   ];
 
   const templates = [
@@ -99,12 +88,6 @@ export const OnboardingWizard: React.FC = () => {
     }
   ];
 
-  const toggleObjective = (objLabel: string) => {
-    setObjectives(prev => 
-      prev.includes(objLabel) ? prev.filter(o => o !== objLabel) : [...prev, objLabel]
-    );
-  };
-
   const handleAvatarUpload = async (file?: File) => {
     if (!file) return;
     setIsUploadingAvatar(true);
@@ -123,16 +106,32 @@ export const OnboardingWizard: React.FC = () => {
     const completedUser = {
       ...user,
       name,
-      email,
+      email: user.email,
       avatar,
       businessType,
-      teamSize,
-      objectives,
+      // Mantém compatibilidade com o campo legado do banco; a capacidade real
+      // é determinada exclusivamente pelo plano, nunca por uma resposta manual.
+      teamSize: String(getPlanDetails(user.plan).userLimit),
+      objectives: [],
       template
     };
 
     const selectedTpl = templates.find(t => t.id === template);
-    const selectedColumns = selectedTpl?.columns || [];
+    const selectedColumns: KanbanColumn[] = template === 'Personalizado'
+      ? customColumns.map((column, order) => ({ ...column, title: column.title.trim().toUpperCase(), order }))
+      : (selectedTpl?.columns || []);
+    if (!name.trim()) {
+      addToast('error', 'Nome obrigatório', 'Informe seu nome para continuar.');
+      return;
+    }
+    if (selectedColumns.length < 3 || selectedColumns.length > 12 || selectedColumns.some(column => !column.title.trim())) {
+      addToast('error', 'Kanban inválido', 'Use entre 3 e 12 colunas e preencha todos os nomes.');
+      return;
+    }
+    if (new Set(selectedColumns.map(column => column.title.trim().toLocaleLowerCase('pt-BR'))).size !== selectedColumns.length) {
+      addToast('error', 'Nomes repetidos', 'Cada coluna do Kanban precisa ter um nome diferente.');
+      return;
+    }
     setIsFinishing(true);
     try {
       // Perfil e Kanban são confirmados na mesma transação do Supabase.
@@ -145,7 +144,6 @@ export const OnboardingWizard: React.FC = () => {
 
     setUser(completedUser);
 
-    // 2. Set selected Kanban columns template
     if (selectedColumns.length) setKanbanColumns(selectedColumns);
 
     addToast('success', 'StudioDesk Configurado', 'Seu espaço de trabalho foi configurado com sucesso!');
@@ -160,11 +158,11 @@ export const OnboardingWizard: React.FC = () => {
         <div className="flex items-center justify-between">
           <Logo size="md" />
           <div className="text-right">
-            <span className="text-xs font-bold text-[#6B7280]">Etapa {step} de 6</span>
+            <span className="text-xs font-bold text-[#6B7280]">Etapa {step} de 4</span>
             <div className="w-32 h-1.5 bg-[#DDE3E8] rounded-full overflow-hidden mt-1">
               <div
                 className="h-full bg-[#66acd7] transition-all duration-300 rounded-full"
-                style={{ width: `${(step / 6) * 100}%` }}
+                style={{ width: `${(step / 4) * 100}%` }}
               />
             </div>
           </div>
@@ -235,6 +233,8 @@ export const OnboardingWizard: React.FC = () => {
                     <input
                       type="text"
                       value={name}
+                      required
+                      maxLength={160}
                       onChange={e => setName(e.target.value)}
                       placeholder="Seu nome"
                       className="w-full pl-9 pr-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#66acd7]"
@@ -248,16 +248,17 @@ export const OnboardingWizard: React.FC = () => {
                     <Mail className="w-4 h-4 text-[#6B7280] absolute left-3 top-3" />
                     <input
                       type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="seu.email@empresa.com"
-                      className="w-full pl-9 pr-3 py-2.5 bg-[#F5F7F9] border border-[#DDE3E8] rounded-xl text-xs text-[#111111] focus:bg-white focus:outline-none focus:border-[#66acd7]"
+                      value={user.email}
+                      readOnly
+                      aria-readonly="true"
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-100 border border-[#DDE3E8] rounded-xl text-xs text-[#6B7280] cursor-not-allowed"
                     />
                   </div>
+                  <p className="mt-1 text-[10px] text-[#6B7280]">E-mail vinculado à sua conta; não precisa ser preenchido novamente.</p>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-[#111111] mb-1">Foto do perfil</label>
+                  <label className="block text-xs font-bold text-[#111111] mb-1">Foto do perfil (opcional)</label>
                   <div className="flex items-center gap-3">
                     {avatar ? (
                       <img src={avatar} alt="Prévia da foto" className="w-14 h-14 rounded-xl object-cover border border-[#DDE3E8]" />
@@ -317,6 +318,63 @@ export const OnboardingWizard: React.FC = () => {
                     </div>
                   );
                 })}
+                <div
+                  onClick={() => setTemplate('Personalizado')}
+                  className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                    template === 'Personalizado' ? 'border-[#66acd7] bg-blue-50/40 shadow-xs' : 'border-[#DDE3E8] bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#111111]">Personalizar Kanban</span>
+                    {template === 'Personalizado' && <span className="text-[10px] bg-[#66acd7] text-[#111111] font-black px-2 py-0.5 rounded">Selecionado</span>}
+                  </div>
+                  <p className="text-[11px] text-[#6B7280] mt-1">Defina os nomes e a quantidade de etapas do seu fluxo.</p>
+                </div>
+                {template === 'Personalizado' && (
+                  <div className="rounded-2xl border border-[#DDE3E8] bg-[#F5F7F9] p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-bold text-[#111111]">Etapas do seu Kanban</p>
+                      <span className="text-[10px] text-[#6B7280]">{customColumns.length}/12 colunas</span>
+                    </div>
+                    {customColumns.map((column, index) => (
+                      <div key={column.id} className="flex items-center gap-2">
+                        <span className="w-6 text-center text-[10px] font-bold text-[#6B7280]">{index + 1}</span>
+                        <input
+                          type="text"
+                          value={column.title}
+                          maxLength={160}
+                          aria-label={`Nome da coluna ${index + 1}`}
+                          onChange={event => setCustomColumns(current => current.map(item => item.id === column.id ? { ...item, title: event.target.value } : item))}
+                          placeholder="Nome da etapa"
+                          className="min-w-0 flex-1 rounded-lg border border-[#DDE3E8] bg-white px-3 py-2 text-xs text-[#111111] focus:outline-none focus:border-[#66acd7]"
+                        />
+                        <button
+                          type="button"
+                          aria-label={`Remover coluna ${index + 1}`}
+                          disabled={customColumns.length <= 3}
+                          onClick={() => setCustomColumns(current => current.filter(item => item.id !== column.id).map((item, order) => ({ ...item, order })))}
+                          className="rounded-lg p-2 text-[#6B7280] hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={customColumns.length >= 12}
+                      onClick={() => setCustomColumns(current => [...current, {
+                        id: `custom_${crypto.randomUUID()}`,
+                        title: '',
+                        color: ['#66acd7', '#2F6F9C', '#8B5CF6', '#F59E0B', '#EC4899', '#10B981'][current.length % 6],
+                        order: current.length,
+                      }])}
+                      className="inline-flex items-center gap-2 rounded-lg border border-dashed border-[#66acd7] px-3 py-2 text-xs font-bold text-[#2F6F9C] hover:bg-white disabled:opacity-40"
+                    >
+                      <Plus className="h-4 w-4" /> Adicionar etapa
+                    </button>
+                    <p className="text-[10px] text-[#6B7280]">Mínimo de 3 e máximo de 12 etapas. Os nomes serão usados nas colunas do seu Kanban.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -327,86 +385,9 @@ export const OnboardingWizard: React.FC = () => {
               <div>
                 <span className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Etapa 4</span>
                 <h2 className="font-display text-2xl sm:text-3xl font-black text-[#111111] uppercase tracking-tight mt-0.5">
-                  Quantas pessoas vão utilizar?
-                </h2>
-                <p className="text-xs text-[#6B7280]">Defina o tamanho aproximado da sua equipe de produção e atendimento.</p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {teamSizes.map(size => {
-                  const isSelected = teamSize === size;
-                  return (
-                    <div
-                      key={size}
-                      onClick={() => setTeamSize(size)}
-                      className={`p-6 rounded-2xl border-2 text-center cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-[#66acd7] bg-[#111111] text-white shadow-md'
-                          : 'border-[#DDE3E8] bg-white text-[#111111] hover:border-gray-300'
-                      }`}
-                    >
-                      <span className="font-display text-3xl font-black block">{size}</span>
-                      <span className="text-[11px] font-semibold opacity-80 mt-1 block">
-                        {size === '1' ? 'Pessoa (Solo)' : 'Usuários'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ETAPA 5 */}
-          {step === 5 && (
-            <div className="space-y-6">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Etapa 5</span>
-                <h2 className="font-display text-2xl sm:text-3xl font-black text-[#111111] uppercase tracking-tight mt-0.5">
-                  Quais são seus principais objetivos?
-                </h2>
-                <p className="text-xs text-[#6B7280]">Marque todos os recursos que você deseja priorizar no StudioDesk.</p>
-              </div>
-
-              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                {allObjectives.map(obj => {
-                  const isChecked = objectives.includes(obj.label);
-                  return (
-                    <div
-                      key={obj.id}
-                      onClick={() => toggleObjective(obj.label)}
-                      className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                        isChecked
-                          ? 'border-[#66acd7] bg-blue-50/40 text-[#111111]'
-                          : 'border-[#DDE3E8] bg-white text-[#6B7280] hover:border-gray-300'
-                      }`}
-                    >
-                      <div>
-                        <span className="text-xs font-bold text-[#111111] block">{obj.label}</span>
-                        <span className="text-[11px] text-[#6B7280]">{obj.desc}</span>
-                      </div>
-                      <div
-                        className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
-                          isChecked ? 'bg-[#2F6F9C] border-[#2F6F9C] text-white' : 'border-[#DDE3E8] bg-white'
-                        }`}
-                      >
-                        {isChecked && <Check className="w-3.5 h-3.5" />}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* ETAPA 6 */}
-          {step === 6 && (
-            <div className="space-y-6">
-              <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-[#6B7280]">Etapa 6</span>
-                <h2 className="font-display text-2xl sm:text-3xl font-black text-[#111111] uppercase tracking-tight mt-0.5">
                   Como você organiza seus projetos?
                 </h2>
-                <p className="text-xs text-[#6B7280]">Escolha um template inicial para as colunas do seu Kanban (você poderá personalizar a qualquer momento).</p>
+                <p className="text-xs text-[#6B7280]">Escolha um dos quatro modelos ou crie suas próprias etapas.</p>
               </div>
 
               <div className="space-y-3">
@@ -447,7 +428,7 @@ export const OnboardingWizard: React.FC = () => {
                 Voltar
               </button>
 
-              {step < 6 ? (
+              {step < 4 ? (
                 <button
                   onClick={() => setStep(prev => prev + 1)}
                   className="bg-[#111111] hover:bg-[#2F6F9C] text-white font-bold text-xs sm:text-sm px-6 py-2.5 rounded-xl transition-all shadow-xs inline-flex items-center gap-2"
