@@ -1,9 +1,11 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
-import { Check, ArrowRight } from 'lucide-react';
+import { Check, ArrowRight, User, Building2, Rocket, Trophy } from 'lucide-react';
 import { PlanType } from '../../types';
 import { PLANS_LIST } from '../../data/plans';
+
+const planIcons = { solo: User, studio: Building2, empresa: Rocket, agencia: Trophy };
 
 export const ProfileSelection: React.FC = () => {
   const { setPlan, setCurrentView } = useApp();
@@ -28,6 +30,8 @@ export const ProfileSelection: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {PLANS_LIST.map((p) => {
+            const PlanIcon = planIcons[p.id as keyof typeof planIcons] ?? User;
+            const iconColor = p.id === 'studio' ? 'text-[#66acd7]' : p.id === 'agencia' ? 'text-[#8B5CF6]' : 'text-[#2F6F9C]';
             return (
               <div
                 key={p.id}
@@ -49,7 +53,7 @@ export const ProfileSelection: React.FC = () => {
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-2xl">{p.icon}</span>
+                    <PlanIcon className={`h-6 w-6 ${iconColor}`} aria-hidden="true" />
                     <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
                       p.id === 'studio' ? 'bg-white/10 text-[#66acd7]' : 'bg-[#F5F7F9] text-[#6B7280]'
                     }`}>
