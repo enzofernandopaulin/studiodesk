@@ -311,7 +311,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsHydrated(true);
       const hasBusinessData = workspace.leads.length > 0 || workspace.clients.length > 0 || workspace.projects.length > 0 || workspace.tasks.length > 0;
       setWorkspaceStatus(hasBusinessData ? 'ready' : 'empty');
-      return !profile.businessType || !profile.teamSize;
+      return !profile.template;
     } catch (error) {
       console.error('StudioDesk: falha ao carregar dados do Supabase', error);
       const message = error instanceof Error ? error.message : 'Não foi possível carregar seu workspace.';
