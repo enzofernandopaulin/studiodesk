@@ -1,5 +1,7 @@
 # StudioDesk — CRM Kanban para Agências Criativas
 
+> **Atualizações Ruan Beguetto — etapa 0:** siga primeiro [o roteiro atual](docs/etapas/ETAPA-0.md), incluindo as ordens para [Supabase](docs/etapas/SUPABASE-ETAPA-0.md) e [Vercel](docs/etapas/VERCEL-ETAPA-0.md). As instruções históricas abaixo não constituem uma sequência de migração homologada.
+
 StudioDesk é um CRM/Kanban para agências criativas, agora preparado para uma arquitetura Serverless com **Vercel + Supabase**.
 
 ## Arquitetura da primeira fase
@@ -23,16 +25,7 @@ npm install
 
 ### 2. Crie um projeto no Supabase
 
-No SQL Editor do projeto, execute:
-
-```text
-supabase/schema.sql
-supabase/migrations/20260907_priority_zero_security.sql
-```
-
-Em projetos já existentes, execute apenas a migration de segurança mais recente.
-Ela remove a RPC destrutiva antiga, instala o bootstrap transacional, protege
-planos e permissões e aplica os controles necessários aos convites de equipe.
+Antes de instalar ou atualizar o banco, siga [Supabase — etapa 0](docs/etapas/SUPABASE-ETAPA-0.md). Em banco existente, execute somente os diagnósticos 01 e 02 nessa ordem. A sequência de migrações será definida após reconciliar o inventário real; não execute todos os SQL históricos em lote.
 
 ### 3. Configure as variáveis
 

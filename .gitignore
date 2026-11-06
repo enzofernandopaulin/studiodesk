@@ -8,3 +8,10 @@ coverage/
 !.env.example
 .env.local
 .env.*.local
+
+# Artefatos privados de operação / etapa 0
+.vercel/
+backups/
+private-evidence/
+*.dump
+*.backup
