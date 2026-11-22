@@ -18,6 +18,7 @@ export const REALTIME_TABLES = [
   'workspace_members',
   'team_members',
   'integrations',
+  'workspace_chat_messages',
 ] as const;
 
 export type RealtimeTable = typeof REALTIME_TABLES[number];

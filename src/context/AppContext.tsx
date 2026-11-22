@@ -43,6 +43,7 @@ interface AppContextType {
   timelineEvents: TimelineEvent[];
   messages: Message[];
   communications: Communication[];
+  chatRefreshToken: number;
   addCommunication: (comm: Omit<Communication, 'id' | 'timestamp'>) => Promise<void>;
   calendarEvents: CalendarEvent[];
   addCalendarEvent: (event: Omit<CalendarEvent, 'id' | 'createdAt'>) => Promise<CalendarEvent>;
@@ -230,6 +231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [communications, setCommunications] = useState<Communication[]>([]);
+  const [chatRefreshToken, setChatRefreshToken] = useState(0);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<ApprovalRequest[]>([]);
   const [team, setTeam] = useState<TeamMember[]>([]);
@@ -542,27 +544,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (cancelled || !activeWorkspaceId) return;
         const tables = [...pendingTables];
         pendingTables = new Set();
-        try {
-          const teamChanged = tables.some(table => table === 'workspace_members' || table === 'team_members');
-          const dataTables = tables.filter(table => table !== 'workspace_members' && table !== 'team_members');
-          const [patch] = await Promise.all([
-            loadWorkspacePatch(activeWorkspaceId, dataTables),
-            teamChanged ? refreshTeam() : Promise.resolve(),
-          ]);
-          if (cancelled) return;
-          if (patch.leads) setLeads(patch.leads);
-          if (patch.clients) setClients(patch.clients);
-          if (patch.projects) setProjects(patch.projects);
-          if (patch.tasks) setTasks(patch.tasks);
-          if (patch.kanbanColumns) setKanbanColumns(patch.kanbanColumns.length ? patch.kanbanColumns : DEFAULT_KANBAN_COLUMNS);
-          if (patch.timelineEvents) setTimelineEvents(patch.timelineEvents);
-          if (patch.messages) setMessages(patch.messages);
-          if (patch.communications) setCommunications(patch.communications);
-          if (patch.calendarEvents) setCalendarEvents(patch.calendarEvents);
-          if (patch.approvalRequests) setApprovalRequests(patch.approvalRequests);
-          if (patch.integrations) setIntegrations(patch.integrations);
-        } catch (error) {
-          console.error('StudioDesk: falha ao atualizar dados em tempo real', error);
+        const teamChanged = tables.some(table => table === 'workspace_members' || table === 'team_members');
+        const chatChanged = tables.includes('workspace_chat_messages');
+        const dataTables = tables.filter(table =>
+          table !== 'workspace_members' && table !== 'team_members' && table !== 'workspace_chat_messages'
+        );
+
+        // O chat não depende do refresh da equipe nem das demais tabelas.
+        // Incrementar antes das consultas garante que uma falha paralela não
+        // impeça a tela de buscar as novas mensagens.
+        if (chatChanged) setChatRefreshToken(current => current + 1);
+
+        if (teamChanged) {
+          void refreshTeam().catch(error => {
+            console.error('StudioDesk: falha ao atualizar equipe em tempo real', error);
+          });
+        }
+
+        if (dataTables.length) {
+          try {
+            const patch = await loadWorkspacePatch(activeWorkspaceId, dataTables);
+            if (cancelled) return;
+            if (patch.leads) setLeads(patch.leads);
+            if (patch.clients) setClients(patch.clients);
+            if (patch.projects) setProjects(patch.projects);
+            if (patch.tasks) setTasks(patch.tasks);
+            if (patch.kanbanColumns) setKanbanColumns(patch.kanbanColumns.length ? patch.kanbanColumns : DEFAULT_KANBAN_COLUMNS);
+            if (patch.timelineEvents) setTimelineEvents(patch.timelineEvents);
+            if (patch.messages) setMessages(patch.messages);
+            if (patch.communications) setCommunications(patch.communications);
+            if (patch.calendarEvents) setCalendarEvents(patch.calendarEvents);
+            if (patch.approvalRequests) setApprovalRequests(patch.approvalRequests);
+            if (patch.integrations) setIntegrations(patch.integrations);
+          } catch (error) {
+            console.error('StudioDesk: falha ao atualizar tabelas em tempo real', error);
+          }
         }
       }, 350);
     };
@@ -1336,6 +1352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         timelineEvents,
         messages,
         communications,
+        chatRefreshToken,
         calendarEvents,
         addCalendarEvent,
         updateCalendarEvent,
