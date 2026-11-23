@@ -6,6 +6,24 @@ import { rateLimit, readJson, requireAllowedOrigin } from '../_lib/security.js';
 type Role = 'admin' | 'gestor' | 'colaborador';
 const PLAN_LIMITS: Record<string, number> = { individual: 1, solo: 1, studio: 10, empresa: 25, agencia: 50 };
 
+function getInviteAppUrl(request: Request): string {
+  const configuredUrl = String(process.env.APP_URL || '').trim().replace(/\/$/, '');
+  if (/^https:\/\//i.test(configuredUrl) || (process.env.VERCEL_ENV !== 'production' && /^http:\/\//i.test(configuredUrl))) {
+    return configuredUrl;
+  }
+
+  // APP_URL pode não existir em previews ou pode ficar temporariamente fora de
+  // sincronia com o domínio ativo. O próprio request é uma origem confiável
+  // depois de requireAllowedOrigin(), então o link continua funcional sem
+  // precisar expor ou adivinhar um domínio.
+  const requestOrigin = new URL(request.url).origin.replace(/\/$/, '');
+  if (/^https:\/\//i.test(requestOrigin) || (process.env.VERCEL_ENV !== 'production' && /^http:\/\//i.test(requestOrigin))) {
+    return requestOrigin;
+  }
+
+  return '';
+}
+
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
   const webRequest = toWebRequest(request);
@@ -135,9 +153,8 @@ export default async function handler(request: any, response: any) {
     const role: Role = requestedRole === 'admin' || requestedRole === 'gestor' || requestedRole === 'colaborador'
       ? requestedRole
       : 'colaborador';
-    const appUrl = String(process.env.APP_URL || '').replace(/\/$/, '');
-    const isValidAppUrl = /^https:\/\//i.test(appUrl) || (process.env.VERCEL_ENV !== 'production' && /^http:\/\//i.test(appUrl));
-    if (!isValidAppUrl) return response.status(503).json({ error: 'APP_URL não está configurada corretamente.' });
+    const appUrl = getInviteAppUrl(webRequest);
+    if (!appUrl) return response.status(503).json({ error: 'Não foi possível determinar o domínio do StudioDesk para gerar o convite.' });
     if (teamName) {
       const { error: nameError } = await admin.from('workspaces').update({ name: teamName, updated_at: new Date().toISOString() }).eq('id', membership.workspace_id);
       if (nameError) throw nameError;
