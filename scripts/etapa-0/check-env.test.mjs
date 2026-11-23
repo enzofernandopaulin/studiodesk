@@ -1,0 +1,20 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { checkEnv } from './check-env.mjs';
+const valid = { STUDIODESK_ENV: 'staging', STUDIODESK_PRODUCTION_SUPABASE_URL: 'https://production.supabase.co', VITE_SUPABASE_URL: 'https://staging.supabase.co', SUPABASE_URL: 'https://staging.supabase.co', VITE_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_fixture', SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_fixture', APP_URL: 'https://staging.example.test' };
+const jwt = payload => `header.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.signature`;
+test('configuração sintética separada passa sem consultar rede', () => assert.equal(checkEnv(valid).ok, true));
+test('variáveis ausentes falham', () => assert.equal(checkEnv({}).ok, false));
+test('staging apontando para produção falha', () => assert.equal(checkEnv({ ...valid, STUDIODESK_PRODUCTION_SUPABASE_URL: valid.SUPABASE_URL }).ok, false));
+test('frontend e servidor diferentes falham', () => assert.equal(checkEnv({ ...valid, SUPABASE_URL: 'https://other.supabase.co' }).ok, false));
+test('segredo público é bloqueado sem vazar valor ou nome arbitrário', () => {
+  const secret = 'sb_secret_DO_NOT_PRINT';
+  const result = checkEnv({ ...valid, VITE_DO_NOT_PRINT: secret });
+  assert.equal(result.ok, false);
+  assert.equal(JSON.stringify(result).includes('DO_NOT_PRINT'), false);
+});
+test('JWT service_role no frontend falha', () => assert.equal(checkEnv({ ...valid, VITE_SUPABASE_PUBLISHABLE_KEY: jwt({ role: 'service_role' }) }).ok, false));
+test('JWT anon legado do projeto correto passa', () => assert.equal(checkEnv({ ...valid, VITE_SUPABASE_PUBLISHABLE_KEY: jwt({ role: 'anon', ref: 'staging' }) }).ok, true));
+test('JWT de outro projeto falha', () => assert.equal(checkEnv({ ...valid, VITE_SUPABASE_PUBLISHABLE_KEY: jwt({ role: 'anon', ref: 'other' }) }).ok, false));
+test('URLs com credenciais ou parâmetros falham', () => assert.equal(checkEnv({ ...valid, APP_URL: 'https://user:secret@example.test/?token=private' }).ok, false));
+test('exemplos não substituídos falham', () => assert.equal(checkEnv({ ...valid, SUPABASE_SERVICE_ROLE_KEY: 'sb_secret_SUA_CHAVE_SECRETA' }).ok, false));

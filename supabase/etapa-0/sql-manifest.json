@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "note": "Inventário de arquivos, NÃO é uma ordem de migração nem histórico do banco remoto.",
+  "files": [
+    {
+      "path": "supabase/CORRECAO-WORKSPACES-E-CONVITES.sql",
+      "sha256": "b3c9447946b41118b3689912bd7a3168751accd8a386777f31494ce150d68736",
+      "bytes": 23691,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/DIAGNOSTICO-AUTH.sql",
+      "sha256": "b167ee1a663d3a1224511521b08b42b92909ddaee7c5deaae2c8a6f68f2ff84e",
+      "bytes": 1522,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/DIAGNOSTICO-EQUIPE.sql",
+      "sha256": "2f0f1360e860869c0a1fdbda692839cbd40847e1d33e705e2b9d60fbdc2ded8c",
+      "bytes": 1620,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/EQUIPE-PROFISSIONAL.sql",
+      "sha256": "d3d774d4ecae5e5a48267c44fe2e04c4ed759c7861295bbfab58d68c36db3266",
+      "bytes": 7672,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/FASE-1-INTEGRIDADE.sql",
+      "sha256": "60153d1e0c874f936cdae09cdca394b891c7eafe7231c6b76d999f42f413e1eb",
+      "bytes": 8023,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/FASE-2-PERFORMANCE.sql",
+      "sha256": "abeb6b896c4445454966e82127c430b655a07fb23aca51ec95e9c737682e5ecd",
+      "bytes": 2611,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/FASE-4-PAGINACAO.sql",
+      "sha256": "b14198062bbe23caa95959ad1a18228a320562be6d2b0944cea1ee9ae5eff7aa",
+      "bytes": 1241,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/FOTO-PERFIL-STORAGE.sql",
+      "sha256": "fbd5d3ac2cee7807323a8522826f3c756322b23dd1f07c473d27556bb97696b1",
+      "bytes": 1875,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/MULTI-WORKSPACE.sql",
+      "sha256": "f53b5588ce0ad3b3d59e186e7f83593107863c639cc9dbc16bd1d65e0b5af1d0",
+      "bytes": 2230,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/TEAM-INVITES.sql",
+      "sha256": "3e0c9edb294f9fb34ba26a3f0bdf258baea25422db6320dfd34fb7feff069cbd",
+      "bytes": 1720,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/VERIFY-PRIORITY-ZERO.sql",
+      "sha256": "ce47c29824db8956feeb82b2d1c9fca02f46931586f96073048e17132d67926e",
+      "bytes": 2034,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/etapa-0/01-inventario-somente-leitura.sql",
+      "sha256": "0413ffb4b6f2ba53cf242b6edcdc1bb7259305b31560854380f71fbab22da9f8",
+      "bytes": 3284,
+      "usage": "diagnostico-somente-leitura"
+    },
+    {
+      "path": "supabase/etapa-0/02-preflight-somente-leitura.sql",
+      "sha256": "b9bc83f1a4d405d2a6bd73645aaa6ba41db986f032997e9041bde41a774f7dec",
+      "bytes": 1659,
+      "usage": "diagnostico-somente-leitura"
+    },
+    {
+      "path": "supabase/migrations/20260907_priority_zero_security.sql",
+      "sha256": "df844fc505259cf012646f36bbb02401bcccec4e77b40bca2fd1bea3deaaa383",
+      "bytes": 16196,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/migrations/20261009_minimum_function_privileges.sql",
+      "sha256": "c524282638fe7b0ce9aec1309c42be45cbbbb0f1ffbc73d6caf97e22e39d0600",
+      "bytes": 1100,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/migrations/20261009_remove_redundant_indexes.sql",
+      "sha256": "f3e0a32f6cd806e4f01b631d4eaab89249e0af12758fd824a403971cbda8f50b",
+      "bytes": 1109,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/migrations/20261009_revoke_anon_table_privileges.sql",
+      "sha256": "3ebd7b3d96779961cec29d71bc77da8a19617c9947bdd464a06ff19d7e8e5ad9",
+      "bytes": 384,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/migrations/20261009_revoke_public_function_execute.sql",
+      "sha256": "396e8a1779df0d413594efc84958ef702f5ee4ba1a01302c97380dc9c3a60fa9",
+      "bytes": 1523,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/migrations/20261022_security_and_workspace_isolation.sql",
+      "sha256": "7f2653ff4d6c4f7943be35744b82b797901907614d40d23f195b2cc0a0d258d8",
+      "bytes": 6851,
+      "usage": "historico-nao-executar-automaticamente"
+    },
+    {
+      "path": "supabase/schema.sql",
+      "sha256": "1cd0344c78e9a46c182d472820aec07345aa94d0d802a4131a8da1fa4e06fbdb",
+      "bytes": 48743,
+      "usage": "historico-nao-executar-automaticamente"
+    }
+  ]
+}

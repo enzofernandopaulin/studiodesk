@@ -8,7 +8,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "check:env": "node scripts/etapa-0/check-env.mjs",
+    "check:sql": "node scripts/etapa-0/sql-manifest.mjs --check",
+    "test:etapa0": "node --test scripts/etapa-0/*.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
