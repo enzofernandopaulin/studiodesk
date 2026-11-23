@@ -1,6 +1,6 @@
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { getPortalScope } from '../_lib/portalAuth.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { getPortalScope } from '../portalAuth.js';
 
 async function loadData(request: Request) {
   const admin = getAdminClient();

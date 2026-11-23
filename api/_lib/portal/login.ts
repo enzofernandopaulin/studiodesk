@@ -1,7 +1,7 @@
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { getClientIp, rateLimit, readJson as readBody, requireAllowedOrigin } from '../_lib/security.js';
-import { createPortalSession, setCookieHeaders, verifyPortalAccessKey, verifyPortalPassword } from '../_lib/portalAuth.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { getClientIp, rateLimit, readJson as readBody, requireAllowedOrigin } from '../security.js';
+import { createPortalSession, setCookieHeaders, verifyPortalAccessKey, verifyPortalPassword } from '../portalAuth.js';
 type Body = { accessKey?: unknown; accessCode?: unknown };
 export default async function handler(request: any, response: any) {
   const webRequest = toWebRequest(request);

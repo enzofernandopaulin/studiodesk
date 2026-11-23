@@ -1,7 +1,7 @@
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { getPortalScope } from '../_lib/portalAuth.js';
-import { isSafeStoragePath } from '../_lib/security.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { getPortalScope } from '../portalAuth.js';
+import { isSafeStoragePath } from '../security.js';
 const BUCKET = 'studiodesk-files';
 export default async function handler(request: any, response: any) {
   const webRequest = toWebRequest(request);

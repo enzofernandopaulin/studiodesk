@@ -1,7 +1,7 @@
-import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { readJson, rateLimit, requireAllowedOrigin } from '../_lib/security.js';
-import { createPortalAccessKey, hashPortalPassword, newToken } from '../_lib/portalAuth.js';
+import { authenticateRequest, getMembership } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { readJson, rateLimit, requireAllowedOrigin } from '../security.js';
+import { createPortalAccessKey, hashPortalPassword, newToken } from '../portalAuth.js';
 type Body = { workspaceId?: unknown; projectId?: unknown; clientId?: unknown; accessId?: unknown };
 function isManager(role: string): boolean { return role === 'admin' || role === 'gestor'; }
 export default async function handler(request: any, response: any) {

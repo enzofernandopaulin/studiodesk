@@ -1,7 +1,7 @@
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { clearCookieHeaders, csrfTokenFromRequest, revokePortalSession } from '../_lib/portalAuth.js';
-import { requireAllowedOrigin } from '../_lib/security.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { clearCookieHeaders, csrfTokenFromRequest, revokePortalSession } from '../portalAuth.js';
+import { requireAllowedOrigin } from '../security.js';
 export default async function handler(request: any, response: any) {
   const webRequest = toWebRequest(request);
   if (request.method !== 'POST') return sendWebResponse(methodNotAllowed(['POST']), response);

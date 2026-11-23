@@ -1,20 +1,15 @@
 # StudioDesk — Portal do Cliente
 
-> Bundle compacto para copiar e enviar em outro chat.
+> Bundle atualizado após a consolidação das seis rotas do Portal em uma função Vercel catch-all.
 
 > As migrations abaixo **não foram executadas**.
 
-## Alterações principais
+## Arquitetura de funções
 
-- Login por link individual opaco + código gerado pelo servidor.
-- O cliente não informa IDs técnicos.
-- Link assinado com HMAC server-side.
-- Código armazenado somente como hash Argon2id.
-- Aprovação preparada para RPC transacional.
-- `approval_requests.id` e `approval_comments.id` tratados como `text`.
-- Rate limit distribuído sem fallback silencioso.
-- `approval_requests` filtrada por workspace, projeto e cliente.
-- Kanban mostra somente a etapa atual; tarefas ficam em lista neutra.
+- As URLs públicas continuam `/api/portal/access`, `/api/portal/approval-action`, `/api/portal/file`, `/api/portal/login`, `/api/portal/logout` e `/api/portal/session`.
+- Todas são despachadas por `api/portal/[...route].ts`.
+- As implementações ficam em `api/_lib/portal/`, que não é convertido em função serverless.
+- Total final: 12 funções serverless no plano Hobby.
 
 ## Entrada do Portal
 
@@ -38,6 +33,41 @@ createRoot(document.getElementById('root')!).render(isPortal ? <StrictMode><Port
     </AppProvider>
   </StrictMode>
 ));
+
+
+```
+
+## Dispatcher único das rotas do Portal
+
+**Arquivo:** `api/portal/[...route].ts`
+
+
+```ts
+
+import accessHandler from '../_lib/portal/access.js';
+import approvalActionHandler from '../_lib/portal/approval-action.js';
+import fileHandler from '../_lib/portal/file.js';
+import loginHandler from '../_lib/portal/login.js';
+import logoutHandler from '../_lib/portal/logout.js';
+import sessionHandler from '../_lib/portal/session.js';
+
+type Handler = (request: any, response: any) => Promise<unknown> | unknown;
+const handlers: Record<string, Handler> = {
+  access: accessHandler,
+  'approval-action': approvalActionHandler,
+  file: fileHandler,
+  login: loginHandler,
+  logout: logoutHandler,
+  session: sessionHandler,
+};
+
+export default async function handler(request: any, response: any) {
+  const pathname = new URL(request.url, `https://${request.headers.host || 'localhost'}`).pathname;
+  const route = pathname.replace(/^\/api\/portal\/?/, '').split('/')[0] || '';
+  const target = handlers[route];
+  if (!target) return response.status(404).json({ error: 'Rota do Portal não encontrada.' });
+  return target(request, response);
+}
 
 
 ```
@@ -296,17 +326,17 @@ export async function hashPortalPassword(password: string): Promise<string> {
 
 ```
 
-## Login
+## Login interno
 
-**Arquivo:** `api/portal/login.ts`
+**Arquivo:** `api/_lib/portal/login.ts`
 
 
 ```ts
 
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { getClientIp, rateLimit, readJson as readBody, requireAllowedOrigin } from '../_lib/security.js';
-import { createPortalSession, setCookieHeaders, verifyPortalAccessKey, verifyPortalPassword } from '../_lib/portalAuth.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { getClientIp, rateLimit, readJson as readBody, requireAllowedOrigin } from '../security.js';
+import { createPortalSession, setCookieHeaders, verifyPortalAccessKey, verifyPortalPassword } from '../portalAuth.js';
 type Body = { accessKey?: unknown; accessCode?: unknown };
 export default async function handler(request: any, response: any) {
   const webRequest = toWebRequest(request);
@@ -346,17 +376,17 @@ export default async function handler(request: any, response: any) {
 
 ```
 
-## Gerenciamento de acessos
+## Gerenciamento interno de acessos
 
-**Arquivo:** `api/portal/access.ts`
+**Arquivo:** `api/_lib/portal/access.ts`
 
 
 ```ts
 
-import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { readJson, rateLimit, requireAllowedOrigin } from '../_lib/security.js';
-import { createPortalAccessKey, hashPortalPassword, newToken } from '../_lib/portalAuth.js';
+import { authenticateRequest, getMembership } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { readJson, rateLimit, requireAllowedOrigin } from '../security.js';
+import { createPortalAccessKey, hashPortalPassword, newToken } from '../portalAuth.js';
 type Body = { workspaceId?: unknown; projectId?: unknown; clientId?: unknown; accessId?: unknown };
 function isManager(role: string): boolean { return role === 'admin' || role === 'gestor'; }
 export default async function handler(request: any, response: any) {
@@ -422,14 +452,14 @@ export default async function handler(request: any, response: any) {
 
 ## Sessão e dados autorizados
 
-**Arquivo:** `api/portal/session.ts`
+**Arquivo:** `api/_lib/portal/session.ts`
 
 
 ```ts
 
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { getPortalScope } from '../_lib/portalAuth.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { getPortalScope } from '../portalAuth.js';
 
 async function loadData(request: Request) {
   const admin = getAdminClient();
@@ -473,15 +503,15 @@ export default async function handler(request: any, response: any) {
 
 ## Ações de aprovação
 
-**Arquivo:** `api/portal/approval-action.ts`
+**Arquivo:** `api/_lib/portal/approval-action.ts`
 
 
 ```ts
 
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { csrfTokenFromRequest, getPortalScope } from '../_lib/portalAuth.js';
-import { readJson as readBody, rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { csrfTokenFromRequest, getPortalScope } from '../portalAuth.js';
+import { readJson as readBody, rateLimit, requireAllowedOrigin } from '../security.js';
 
 type Body = { approvalId?: unknown; action?: unknown; comment?: unknown };
 const actions = new Set(['approve', 'reject', 'needs_revision', 'comment']);
@@ -529,15 +559,15 @@ export default async function handler(request: any, response: any) {
 
 ## Entrega de arquivos
 
-**Arquivo:** `api/portal/file.ts`
+**Arquivo:** `api/_lib/portal/file.ts`
 
 
 ```ts
 
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { getPortalScope } from '../_lib/portalAuth.js';
-import { isSafeStoragePath } from '../_lib/security.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { getPortalScope } from '../portalAuth.js';
+import { isSafeStoragePath } from '../security.js';
 const BUCKET = 'studiodesk-files';
 export default async function handler(request: any, response: any) {
   const webRequest = toWebRequest(request);
@@ -577,15 +607,15 @@ export default async function handler(request: any, response: any) {
 
 ## Logout
 
-**Arquivo:** `api/portal/logout.ts`
+**Arquivo:** `api/_lib/portal/logout.ts`
 
 
 ```ts
 
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { clearCookieHeaders, csrfTokenFromRequest, revokePortalSession } from '../_lib/portalAuth.js';
-import { requireAllowedOrigin } from '../_lib/security.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { clearCookieHeaders, csrfTokenFromRequest, revokePortalSession } from '../portalAuth.js';
+import { requireAllowedOrigin } from '../security.js';
 export default async function handler(request: any, response: any) {
   const webRequest = toWebRequest(request);
   if (request.method !== 'POST') return sendWebResponse(methodNotAllowed(['POST']), response);

@@ -1,7 +1,7 @@
-import { getAdminClient } from '../_lib/supabaseAdmin.js';
-import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
-import { csrfTokenFromRequest, getPortalScope } from '../_lib/portalAuth.js';
-import { readJson as readBody, rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+import { getAdminClient } from '../supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../http.js';
+import { csrfTokenFromRequest, getPortalScope } from '../portalAuth.js';
+import { readJson as readBody, rateLimit, requireAllowedOrigin } from '../security.js';
 
 type Body = { approvalId?: unknown; action?: unknown; comment?: unknown };
 const actions = new Set(['approve', 'reject', 'needs_revision', 'comment']);
