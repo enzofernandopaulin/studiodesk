@@ -43,7 +43,10 @@ export default async function handler(request: any, response: any) {
         .select('id,name,owner_id,plan').eq('id', actorMembership.workspace_id).single();
       if (workspaceError) throw workspaceError;
       const { data: memberships, error: membershipsError } = await admin.from('workspace_members')
-        .select('user_id,role,created_at').eq('workspace_id', actorMembership.workspace_id).order('created_at');
+        .select('user_id,role,created_at')
+        .eq('workspace_id', actorMembership.workspace_id)
+        .in('role', ['admin', 'gestor', 'colaborador'])
+        .order('created_at');
       if (membershipsError) throw membershipsError;
       const userIds = (memberships || []).map(item => item.user_id);
       const [{ data: profiles, error: profilesError }, { data: directory, error: directoryError }] = userIds.length
@@ -118,7 +121,10 @@ export default async function handler(request: any, response: any) {
     if (planLookupError) throw planLookupError;
     const plan = workspacePlan?.plan || 'individual';
     const planLimit = PLAN_LIMITS[plan] || 1;
-    const { count: membersCount, error: countError } = await admin.from('workspace_members').select('*', { count: 'exact', head: true }).eq('workspace_id', membership.workspace_id);
+    const { count: membersCount, error: countError } = await admin.from('workspace_members')
+      .select('*', { count: 'exact', head: true })
+      .eq('workspace_id', membership.workspace_id)
+      .in('role', ['admin', 'gestor', 'colaborador']);
     if (countError) throw countError;
     const remainingSeats = Math.max(0, planLimit - (membersCount || 0));
     if (remainingSeats === 0) return response.status(409).json({ error: `O Plano ${plan} atingiu o limite de ${planLimit} usuário(s).` });

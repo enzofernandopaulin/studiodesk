@@ -1,12 +1,13 @@
 import { supabase } from './supabase';
 import {
-  UserProfile, Lead, Client, Project, Task, KanbanColumn, TimelineEvent,
+  UserProfile, PlanType, Lead, Client, Project, Task, KanbanColumn, TimelineEvent,
   Message, Communication, CalendarEvent, ApprovalRequest, TeamMember,
   IntegrationItem, ApprovalComment
 } from '../types';
 import type { RealtimeTable } from './realtimeRepository';
 
 export interface WorkspaceState {
+  plan: PlanType;
   leads: Lead[];
   clients: Client[];
   projects: Project[];
@@ -82,7 +83,8 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
 
   // Núcleo necessário ao dashboard e à navegação principal. Módulos menos
   // frequentes são carregados sob demanda pelo AppContext.
-  const [leads, clients, columns, projects, deliverables, media, comments, tasks, timeline] = await Promise.all([
+  const [workspace, leads, clients, columns, projects, deliverables, media, comments, tasks, timeline] = await Promise.all([
+    supabase.from('workspaces').select('plan').eq('id', workspaceId).single(),
     supabase.from('leads').select(LEAD_COLUMNS).eq('workspace_id', workspaceId).order('created_at', { ascending:false }).order('id').limit(100),
     supabase.from('clients').select(CLIENT_COLUMNS).eq('workspace_id', workspaceId).order('created_at', { ascending:false }).order('id').limit(100),
     supabase.from('kanban_columns').select(COLUMN_COLUMNS).eq('workspace_id', workspaceId).order('sort_order'),
@@ -94,7 +96,7 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
     supabase.from('timeline_events').select(TIMELINE_COLUMNS).eq('workspace_id', workspaceId).order('timestamp_value', { ascending:false }).order('id').limit(20),
   ]);
 
-  const result = [leads, clients, columns, projects, deliverables, media, comments, tasks, timeline];
+  const result = [workspace, leads, clients, columns, projects, deliverables, media, comments, tasks, timeline];
   const failed = result.find(r => r.error);
   if (failed?.error) throw failed.error;
 
@@ -104,6 +106,7 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
   const commentsRows = comments.data ?? [];
 
   return {
+    plan: (workspace.data?.plan || 'individual') as PlanType,
     leads: (leads.data ?? []).map(mapLead),
     clients: (clients.data ?? []).map(mapClient),
     kanbanColumns: (columns.data ?? []).map(c => ({ id:c.id,title:c.title,color:c.color,order:c.sort_order })),

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { ActiveView } from '../../types';
+import { planAllowsTeam } from '../../data/plans';
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -53,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
     badge?: number;
     badgeColor?: string;
     isCore?: boolean;
-    companyOnly?: boolean;
+    requiresTeamPlan?: boolean;
   }> = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'leads', label: 'Leads', icon: Sparkles, badge: activeLeadsCount, badgeColor: 'bg-[#8B5CF6]/15 text-[#8B5CF6]' },
@@ -67,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
     { id: 'activities', label: 'Atividades', icon: Activity },
     { id: 'communication', label: 'Comunicação', icon: MessageSquare },
     { id: 'integrations', label: 'Integrações', icon: Workflow },
-    { id: 'team', label: 'Equipe', icon: UserCheck, companyOnly: true },
+    { id: 'team', label: 'Equipe', icon: UserCheck, requiresTeamPlan: true },
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 
@@ -118,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onCloseM
           </div>
 
           {navigationItems.map(item => {
-            if (item.companyOnly && plan !== 'empresa') {
+            if (item.requiresTeamPlan && !planAllowsTeam(plan)) {
               return null;
             }
 

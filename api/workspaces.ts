@@ -50,9 +50,9 @@ export default async function handler(request: any, response: any) {
       const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId : '';
       const { data: membership } = await admin.from('workspace_members').select('role').eq('workspace_id', workspaceId).eq('user_id', user.id).maybeSingle();
       if (!membership) return response.status(403).json({ error: 'Você não pertence a esse workspace.' });
-      const { data: workspace, error: workspaceError } = await admin.from('workspaces').select('name').eq('id', workspaceId).single();
+      const { data: workspace, error: workspaceError } = await admin.from('workspaces').select('name,plan').eq('id', workspaceId).single();
       if (workspaceError || !workspace) throw workspaceError || new Error('Workspace não encontrado.');
-      const { error } = await admin.from('profiles').update({ workspace_id: workspaceId, company_name: workspace.name, role: membership.role, updated_at: new Date().toISOString() }).eq('id', user.id);
+      const { error } = await admin.from('profiles').update({ workspace_id: workspaceId, company_name: workspace.name, role: membership.role, plan: workspace.plan, updated_at: new Date().toISOString() }).eq('id', user.id);
       if (error) throw error;
       return response.status(200).json({ selected: true });
     }

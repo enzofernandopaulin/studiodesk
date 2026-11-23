@@ -278,6 +278,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         id: userId,
         ...profile,
+        plan: workspace.plan,
         avatar: avatarUrl ?? '',
       }));
 
