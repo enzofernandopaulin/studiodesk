@@ -56,7 +56,7 @@ create or replace function public.apply_client_portal_approval_action(
   p_workspace_id uuid,
   p_project_id text,
   p_client_id text,
-  p_approval_id uuid,
+  p_approval_id text,
   p_action text,
   p_comment text,
   p_author text
@@ -106,12 +106,12 @@ begin
       id, workspace_id, approval_request_id, author, author_role, comment_role,
       timestamp_value, text_value, content, resolved
     ) values (
-      gen_random_uuid(), p_workspace_id, p_approval_id, p_author, 'cliente', 'cliente',
+      'portal_comment_' || gen_random_uuid()::text, p_workspace_id, p_approval_id, p_author, 'cliente', 'cliente',
       now_value, p_comment, p_comment, false
     );
   end if;
 end;
 $$;
 
-revoke all on function public.apply_client_portal_approval_action(uuid, text, text, uuid, text, text, text) from public, anon, authenticated;
-grant execute on function public.apply_client_portal_approval_action(uuid, text, text, uuid, text, text, text) to service_role;
+revoke all on function public.apply_client_portal_approval_action(uuid, text, text, text, text, text, text) from public, anon, authenticated;
+grant execute on function public.apply_client_portal_approval_action(uuid, text, text, text, text, text, text) to service_role;
