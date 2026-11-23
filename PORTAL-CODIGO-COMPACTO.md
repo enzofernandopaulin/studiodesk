@@ -1,0 +1,898 @@
+# StudioDesk — Portal do Cliente
+
+> Bundle compacto para copiar e enviar em outro chat.
+
+> As migrations abaixo **não foram executadas**.
+
+## Alterações principais
+
+- Login por link individual opaco + código gerado pelo servidor.
+- O cliente não informa IDs técnicos.
+- Link assinado com HMAC server-side.
+- Código armazenado somente como hash Argon2id.
+- Aprovação preparada para RPC transacional.
+- Rate limit distribuído sem fallback silencioso.
+- `approval_requests` filtrada por workspace, projeto e cliente.
+- Kanban mostra somente a etapa atual; tarefas ficam em lista neutra.
+
+## Entrada do Portal
+
+**Arquivo:** `src/main.tsx`
+
+
+```tsx
+
+import {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
+import App from './App.tsx';
+import { AppProvider } from './context/AppContext.tsx';
+import { PortalApp } from './portal/PortalApp.tsx';
+import './index.css';
+
+const isPortal = window.location.pathname === '/portal' || window.location.pathname.startsWith('/portal/');
+createRoot(document.getElementById('root')!).render(isPortal ? <StrictMode><PortalApp /></StrictMode> : (
+  <StrictMode>
+    <AppProvider>
+      <App />
+    </AppProvider>
+  </StrictMode>
+));
+
+
+```
+
+## Aplicação do Portal
+
+**Arquivo:** `src/portal/PortalApp.tsx`
+
+
+```tsx
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { CheckCircle2, ChevronRight, Clock3, FileCheck2, KeyRound, LogOut, MessageSquareText, RotateCcw, ShieldCheck, XCircle } from 'lucide-react';
+import { loadPortalData, login, logout, portalAction, type PortalData } from './portalApi';
+
+type Tab = 'kanban' | 'approvals';
+const date = (value: string | null | undefined) => value ? new Date(value.includes('T') ? value : `${value}T12:00:00`).toLocaleDateString('pt-BR') : 'Sem data';
+const statusLabel = (status: string) => ({ pending: 'Pendente', in_review: 'Em análise', approved: 'Aprovado', rejected: 'Reprovado', needs_revision: 'Ajustes solicitados' }[status] || status);
+const statusStyle = (status: string) => status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : status === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-200' : status === 'needs_revision' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-[#2F6F9C] border-blue-200';
+
+const Login: React.FC<{ initialAccessKey: string }> = ({ initialAccessKey }) => {
+  const [accessKey, setAccessKey] = useState(initialAccessKey);
+  const [accessCode, setAccessCode] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const submit = async (event: React.FormEvent) => { event.preventDefault(); setError(''); setLoading(true); try { await login(accessKey.trim(), accessCode.trim()); window.location.reload(); } catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível entrar.'); } finally { setLoading(false); } };
+  return <main className="min-h-screen bg-[#F5F7F9] px-4 py-10 text-[#111111]"><div className="mx-auto flex min-h-[80vh] max-w-5xl items-center justify-center"><div className="grid w-full overflow-hidden rounded-[2rem] border border-[#DDE3E8] bg-white shadow-xl lg:grid-cols-[1fr_0.9fr]"><section className="hidden bg-[#111111] p-10 text-white lg:flex lg:flex-col lg:justify-between"><div><div className="mb-12 flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-[#66acd7] text-[#111111]"><ShieldCheck className="h-6 w-6" /></div><span className="text-xl font-black tracking-tight">StudioDesk</span></div><p className="max-w-sm font-display text-4xl font-black leading-tight">Seu projeto, mais perto e com clareza.</p><p className="mt-5 max-w-sm text-sm leading-6 text-white/65">Acompanhe o andamento da produção e responda às aprovações com segurança.</p></div><p className="text-xs text-white/45">Acesso exclusivo para clientes convidados.</p></section><section className="p-7 sm:p-10"><div className="mb-8 flex items-center gap-3 lg:hidden"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#66acd7] text-[#111111]"><ShieldCheck className="h-5 w-5" /></div><span className="text-lg font-black">StudioDesk</span></div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#2F6F9C]">Portal do cliente</p><h1 className="mt-2 font-display text-3xl font-black tracking-tight">Entrar no seu projeto</h1><p className="mt-2 text-sm leading-6 text-[#6B7280]">Abra o link enviado pela equipe e informe o código de acesso.</p><form onSubmit={submit} className="mt-8 space-y-4">{!initialAccessKey && <label className="block text-sm font-bold">Link de acesso<input required value={accessKey} onChange={e => setAccessKey(e.target.value)} className="mt-2 w-full rounded-xl border border-[#DDE3E8] px-4 py-3 text-sm outline-none focus:border-[#2F6F9C]" placeholder="Cole o link individual recebido" /></label>}<label className="block text-sm font-bold">Código de acesso<input required autoFocus type="text" inputMode="text" autoComplete="one-time-code" value={accessCode} onChange={e => setAccessCode(e.target.value)} className="mt-2 w-full rounded-xl border border-[#DDE3E8] px-4 py-3 text-sm outline-none focus:border-[#2F6F9C]" placeholder="Código enviado pela equipe" /></label>{error && <p className="rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700" role="alert">{error}</p>}<button disabled={loading} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#111111] px-4 py-3.5 text-sm font-bold text-white transition hover:bg-[#2F6F9C] disabled:opacity-60"><KeyRound className="h-4 w-4 text-[#66acd7]" />{loading ? 'Validando...' : 'Acessar portal'}</button></form><p className="mt-6 text-center text-xs leading-5 text-[#6B7280]">Se você não recebeu o link ou o código, solicite um novo acesso à equipe responsável pelo projeto.</p></section></div></div></main>;
+};
+
+const Kanban: React.FC<{ data: PortalData }> = ({ data }) => <section className="space-y-5"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F6F9C]">Acompanhamento</p><h2 className="mt-1 font-display text-3xl font-black">Fluxo do projeto</h2><p className="mt-1 text-sm text-[#6B7280]">As colunas representam a etapa do projeto. As tarefas ficam listadas separadamente porque o modelo atual não possui vínculo tarefa-coluna.</p></div><div className="flex gap-4 overflow-x-auto pb-3">{data.columns.map(column => <div key={column.id} className={`min-w-[250px] flex-1 rounded-2xl border p-4 ${column.id === data.project.column_id ? 'border-[#66acd7] bg-blue-50/40' : 'border-[#DDE3E8] bg-white'}`}><div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: column.color }} /><h3 className="text-sm font-black">{column.title}</h3></div><p className="mt-4 text-xs font-semibold text-[#6B7280]">{column.id === data.project.column_id ? 'Etapa atual do projeto' : 'Etapa do fluxo'}</p></div>)}</div><div className="rounded-2xl border border-[#DDE3E8] bg-white p-5"><div className="flex items-center justify-between"><div><h3 className="text-lg font-black">Tarefas do projeto</h3><p className="mt-1 text-xs text-[#6B7280]">A estrutura atual guarda projeto e tarefa, mas não guarda coluna da tarefa.</p></div><span className="rounded-full bg-[#F5F7F9] px-3 py-1 text-xs font-bold">{data.tasks.length}</span></div><div className="mt-4 grid gap-3 md:grid-cols-2">{data.tasks.length ? data.tasks.map(task => <article key={task.id} className="rounded-xl border border-[#DDE3E8] bg-[#FDFEFE] p-3"><div className="flex items-start justify-between gap-3"><h4 className="text-sm font-bold">{task.title}</h4>{task.completed ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <Clock3 className="h-4 w-4 shrink-0 text-[#6B7280]" />}</div>{task.description && <p className="mt-2 text-xs leading-5 text-[#6B7280]">{task.description}</p>}<p className="mt-3 text-[11px] font-semibold text-[#6B7280]">{task.completed ? 'Concluída' : 'Em andamento'} · {date(task.deadline)}</p></article>) : <p className="rounded-xl border border-dashed border-[#DDE3E8] p-5 text-center text-xs text-[#6B7280]">Nenhuma tarefa neste projeto.</p>}</div></div></section>;
+
+const Approvals: React.FC<{ data: PortalData; refresh: () => Promise<void> }> = ({ data, refresh }) => { const [selected, setSelected] = useState<string | null>(null); const [comment, setComment] = useState(''); const [busy, setBusy] = useState(false); const current = data.approvals.find(item => item.id === selected) || null; const comments = data.comments.filter(item => item.approval_request_id === selected); const act = async (action: string) => { if (!current) return; setBusy(true); try { await portalAction(current.id, action, comment); setComment(''); await refresh(); } catch (e) { window.alert(e instanceof Error ? e.message : 'Não foi possível registrar a ação.'); } finally { setBusy(false); } }; return <section className="space-y-5"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#2F6F9C]">Decisões</p><h2 className="mt-1 font-display text-3xl font-black">Central de aprovação</h2><p className="mt-1 text-sm text-[#6B7280]">Revise materiais e envie seu parecer. Cada ação fica registrada no projeto.</p></div>{data.approvals.length === 0 ? <div className="rounded-2xl border border-dashed border-[#DDE3E8] bg-white p-10 text-center text-sm text-[#6B7280]">Nenhuma solicitação de aprovação disponível.</div> : <div className="grid gap-4 lg:grid-cols-2">{data.approvals.map(item => <button key={item.id} onClick={() => setSelected(item.id)} className="text-left rounded-2xl border border-[#DDE3E8] bg-white p-5 transition hover:-translate-y-0.5 hover:border-[#66acd7] hover:shadow-lg"><div className="flex items-start justify-between gap-3"><div><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyle(item.status)}`}>{statusLabel(item.status)}</span><h3 className="mt-3 text-lg font-black">{item.title}</h3></div><ChevronRight className="h-5 w-5 text-[#6B7280]" /></div><p className="mt-2 line-clamp-3 text-sm leading-6 text-[#6B7280]">{item.description || 'Material aguardando seu parecer.'}</p><div className="mt-4 flex items-center gap-3 text-xs font-semibold text-[#6B7280]"><span>{item.category}</span><span>•</span><span>Prazo: {date(item.due_date)}</span></div></button>)}</div>}{data.mediaApprovals.length > 0 && <div className="rounded-2xl border border-[#DDE3E8] bg-white p-5"><h3 className="flex items-center gap-2 text-sm font-black"><FileCheck2 className="h-4 w-4 text-[#2F6F9C]" />Versões disponíveis</h3><div className="mt-3 flex flex-wrap gap-2">{data.mediaApprovals.map(media => <span key={media.id} className="rounded-xl border border-[#DDE3E8] bg-[#F5F7F9] px-3 py-2 text-xs font-semibold">{media.title} · {media.version} · {statusLabel(media.status)}</span>)}</div></div>}{current && <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#111111]/60 p-4" onClick={() => setSelected(null)}><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}><div className="flex items-center justify-between border-b border-[#DDE3E8] p-6"><div><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${statusStyle(current.status)}`}>{statusLabel(current.status)}</span><h3 className="mt-2 font-display text-2xl font-black">{current.title}</h3></div><button onClick={() => setSelected(null)} className="rounded-xl p-2 text-[#6B7280] hover:bg-[#F5F7F9]">×</button></div><div className="space-y-5 p-6"><p className="text-sm leading-6 text-[#6B7280]">{current.description || 'Sem descrição adicional.'}</p>{current.has_file && <a href={`/api/portal/file?approvalId=${encodeURIComponent(current.id)}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-xl border border-[#DDE3E8] p-4 text-sm font-bold text-[#2F6F9C]"><FileCheck2 className="h-5 w-5" />Abrir material enviado</a>}<div><h4 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[#6B7280]"><MessageSquareText className="h-4 w-4" />Feedback e histórico disponível</h4><div className="mt-3 space-y-2">{comments.map(item => <div key={item.id} className="rounded-xl bg-[#F5F7F9] p-3 text-sm"><p className="font-bold">{item.author}</p><p className="mt-1 text-[#6B7280]">{item.content || item.text_value}</p><p className="mt-2 text-[11px] text-[#9CA3AF]">{date(item.timestamp_value)}</p></div>)}{!comments.length && <p className="text-sm text-[#6B7280]">Ainda não há comentários.</p>}</div></div><textarea value={comment} onChange={e => setComment(e.target.value)} rows={3} placeholder="Escreva um comentário ou feedback (opcional)..." className="w-full rounded-xl border border-[#DDE3E8] p-3 text-sm outline-none focus:border-[#2F6F9C]"/><div className="flex flex-wrap gap-2"><button disabled={busy || current.status === 'approved'} onClick={() => void act('approve')} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"><CheckCircle2 className="h-4 w-4" />Aprovar</button><button disabled={busy} onClick={() => void act('needs_revision')} className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"><RotateCcw className="h-4 w-4" />Solicitar ajustes</button><button disabled={busy} onClick={() => void act('reject')} className="flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"><XCircle className="h-4 w-4" />Reprovar</button><button disabled={busy || !comment.trim()} onClick={() => void act('comment')} className="rounded-xl border border-[#DDE3E8] px-4 py-3 text-sm font-bold disabled:opacity-50">Comentar</button></div></div></div></div>}</section>; };
+
+export const PortalApp: React.FC = () => { const initialAccessKey = new URLSearchParams(window.location.search).get('access') || ''; const [data, setData] = useState<PortalData | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [tab, setTab] = useState<Tab>('kanban'); const refresh = async () => { try { setError(''); setData(await loadPortalData()); } catch (e) { const message = e instanceof Error ? e.message : 'Sessão não encontrada.'; if (/sessão|expirada|inválida/i.test(message)) setData(null); else setError(message); } finally { setLoading(false); } }; useEffect(() => { void refresh(); }, []); if (loading) return <div className="grid min-h-screen place-items-center bg-[#F5F7F9] text-sm font-bold text-[#6B7280]">Carregando Portal…</div>; if (!data) return <Login initialAccessKey={initialAccessKey} />; return <div className="min-h-screen bg-[#F5F7F9] text-[#111111]"><header className="border-b border-[#DDE3E8] bg-white"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-8"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-[#111111] text-[#66acd7]"><ShieldCheck className="h-5 w-5" /></div><div><p className="text-base font-black">StudioDesk <span className="font-normal text-[#6B7280]">/ Portal</span></p><p className="text-xs text-[#6B7280]">{data.scope.clientCompany || data.scope.clientName}</p></div></div><button onClick={async () => { await logout(); setData(null); }} className="flex items-center gap-2 rounded-xl border border-[#DDE3E8] px-3 py-2 text-xs font-bold text-[#6B7280] hover:text-[#111111]"><LogOut className="h-4 w-4" />Sair</button></div></header><main className="mx-auto max-w-7xl space-y-6 px-4 py-7 sm:px-8"><div className="rounded-3xl bg-[#111111] p-6 text-white sm:p-8"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[#66acd7]">Projeto autorizado</p><h1 className="mt-2 font-display text-3xl font-black sm:text-4xl">{data.project.title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">{data.project.description || 'Acompanhe aqui o andamento e as decisões do seu projeto.'}</p><div className="mt-5 flex flex-wrap gap-3 text-xs font-bold"><span className="rounded-full bg-white/10 px-3 py-1.5">Progresso: {data.project.progress}%</span><span className="rounded-full bg-white/10 px-3 py-1.5">Etapa atual: {data.columns.find(c => c.id === data.project.column_id)?.title || data.project.status}</span></div></div>{error && <div className="rounded-xl bg-rose-50 p-4 text-sm font-semibold text-rose-700" role="alert">{error}</div>}<nav className="flex gap-2 rounded-2xl border border-[#DDE3E8] bg-white p-2"><button onClick={() => setTab('kanban')} className={`rounded-xl px-4 py-2.5 text-sm font-bold ${tab === 'kanban' ? 'bg-[#111111] text-white' : 'text-[#6B7280]'}`}>Kanban</button><button onClick={() => setTab('approvals')} className={`rounded-xl px-4 py-2.5 text-sm font-bold ${tab === 'approvals' ? 'bg-[#111111] text-white' : 'text-[#6B7280]'}`}>Aprovações <span className="ml-1 rounded-full bg-[#66acd7] px-1.5 py-0.5 text-[10px] text-[#111111]">{data.approvals.filter(a => a.status !== 'approved').length}</span></button></nav>{tab === 'kanban' ? <Kanban data={data} /> : <Approvals data={data} refresh={refresh} />}</main></div>; };
+
+
+```
+
+## API do frontend
+
+**Arquivo:** `src/portal/portalApi.ts`
+
+
+```ts
+
+export type PortalData = {
+  scope: { projectId: string; clientId: string; clientName: string; clientCompany: string };
+  project: { id: string; title: string; description: string; status: string; column_id: string | null; progress: number; created_at: string };
+  columns: Array<{ id: string; title: string; color: string; sort_order: number }>;
+  tasks: Array<{ id: string; title: string; project_id: string | null; deadline: string | null; priority: string; description: string | null; completed: boolean; completed_at: string | null; created_at: string }>;
+  approvals: Array<{ id: string; title: string; description: string; project_id: string | null; category: string; created_at: string; due_date: string | null; status: string; priority: string; file_type: string | null; has_file: boolean; feedback_notes: string | null; rejection_reason: string | null; revision_notes: string | null; reviewed_at: string | null }>;
+  mediaApprovals: Array<{ id: string; title: string; version: string; status: string; has_video: boolean; has_thumbnail: boolean }>;
+  comments: Array<{ id: string; approval_request_id: string | null; media_approval_id: string | null; author: string; author_role: string | null; comment_role: string | null; timestamp_value: string; timecode: string | null; text_value: string | null; content: string | null; resolved: boolean }>;
+};
+let csrfToken = '';
+function cookie(name: string): string { return document.cookie.split('; ').find(value => value.startsWith(`${name}=`))?.slice(name.length + 1) || ''; }
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, { ...init, credentials: 'include', headers: { 'content-type': 'application/json', ...(init.method && init.method !== 'GET' ? { 'x-csrf-token': csrfToken || cookie('studiodesk_portal_csrf') } : {}), ...(init.headers || {}) } });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.error || 'Não foi possível concluir a solicitação.');
+  return payload as T;
+}
+export async function login(accessKey: string, accessCode: string) { const result = await request<{ ok: true; csrfToken: string }>('/api/portal/login', { method: 'POST', body: JSON.stringify({ accessKey, accessCode }) }); csrfToken = result.csrfToken; return result; }
+export async function loadPortalData() { return request<PortalData>('/api/portal/session'); }
+export async function portalAction(approvalId: string, action: string, comment: string) { return request<{ ok: true }>('/api/portal/approval-action', { method: 'POST', body: JSON.stringify({ approvalId, action, comment }) }); }
+export async function logout() { csrfToken = ''; return request<{ ok: true }>('/api/portal/logout', { method: 'POST' }); }
+
+
+```
+
+## Gerenciador administrativo de acessos
+
+**Arquivo:** `src/components/clients/PortalAccessManager.tsx`
+
+
+```tsx
+
+import React, { useEffect, useState } from 'react';
+import { Check, Copy, KeyRound, Link2, ShieldOff, UserRoundCheck } from 'lucide-react';
+import { callServerApi } from '../../lib/serverApi';
+import type { Project } from '../../types';
+
+type Access = { id: string; project_id: string; client_id: string; is_active: boolean; created_at: string; updated_at: string };
+type Provisioned = { accessCode: string; portalUrl: string };
+interface Props { clientId: string; projects: Project[]; }
+
+export const PortalAccessManager: React.FC<Props> = ({ clientId, projects }) => {
+  const [accesses, setAccesses] = useState<Access[]>([]);
+  const [credentials, setCredentials] = useState<Record<string, Provisioned>>({});
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const load = async () => {
+    try {
+      const result = await callServerApi<{ accesses: Access[] }>(`/api/portal/access?clientId=${encodeURIComponent(clientId)}`);
+      setAccesses(result.accesses || []);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível carregar os acessos do Portal.'); }
+  };
+  useEffect(() => { void load(); }, [clientId]);
+  const provision = async (project: Project) => {
+    setBusy(project.id); setMessage('');
+    try {
+      const result = await callServerApi<Provisioned>('/api/portal/access', { method: 'POST', body: JSON.stringify({ projectId: project.id, clientId }) });
+      setCredentials(previous => ({ ...previous, [project.id]: { accessCode: result.accessCode, portalUrl: result.portalUrl } }));
+      await load();
+      setMessage('Acesso gerado. Copie o link e o código e envie ao cliente por um canal seguro.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível gerar o acesso.'); }
+    finally { setBusy(null); }
+  };
+  const revoke = async (access: Access) => {
+    setBusy(access.id); setMessage('');
+    try { await callServerApi('/api/portal/access', { method: 'DELETE', body: JSON.stringify({ accessId: access.id }) }); await load(); setCredentials(previous => { const next = { ...previous }; delete next[access.project_id]; return next; }); setMessage('Acesso revogado e sessões encerradas.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível revogar o acesso.'); }
+    finally { setBusy(null); }
+  };
+  const copy = async (value: string) => { await navigator.clipboard.writeText(value); setMessage('Copiado para a área de transferência.'); };
+  return <section className="rounded-2xl border border-[#DDE3E8] bg-white p-5 shadow-2xs sm:p-6"><div className="flex items-start justify-between gap-4"><div><div className="flex items-center gap-2"><UserRoundCheck className="h-5 w-5 text-[#2F6F9C]" /><h3 className="font-display text-base font-black uppercase tracking-tight">Acesso ao Portal do Cliente</h3></div><p className="mt-1 text-xs leading-5 text-[#6B7280]">Gere um link individual por projeto e um código de acesso. O código é mostrado somente nesta tela após a geração.</p></div><Link2 className="h-5 w-5 shrink-0 text-[#66acd7]" /></div>{message && <p className="mt-4 rounded-xl bg-blue-50 p-3 text-xs font-semibold text-[#2F6F9C]">{message}</p>}<div className="mt-5 space-y-3">{projects.length === 0 ? <p className="rounded-xl border border-dashed border-[#DDE3E8] p-4 text-center text-xs text-[#6B7280]">Cadastre um projeto para liberar o Portal.</p> : projects.map(project => { const access = accesses.find(item => item.project_id === project.id); const credential = credentials[project.id]; return <div key={project.id} className="rounded-xl border border-[#DDE3E8] bg-[#F8FAFC] p-4"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><p className="text-sm font-bold">{project.title}</p><p className="mt-1 text-[11px] text-[#6B7280]">{access?.is_active ? 'Acesso ativo' : access ? 'Acesso revogado' : 'Sem acesso provisionado'}</p></div><div className="flex flex-wrap gap-2">{access?.is_active && <button type="button" disabled={busy === access.id} onClick={() => void revoke(access)} className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 disabled:opacity-50"><ShieldOff className="h-3.5 w-3.5" />{busy === access.id ? 'Revogando...' : 'Revogar acesso'}</button>}<button type="button" disabled={busy === project.id} onClick={() => void provision(project)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#111111] px-3 py-2 text-xs font-bold text-white hover:bg-[#2F6F9C] disabled:opacity-50"><KeyRound className="h-3.5 w-3.5 text-[#66acd7]" />{busy === project.id ? 'Gerando...' : access?.is_active ? 'Gerar novo acesso' : 'Gerar acesso'}</button></div></div>{credential && <div className="mt-3 grid gap-2 rounded-xl border border-[#B9D8EA] bg-white p-3 text-xs sm:grid-cols-[1fr_auto]"><div className="min-w-0"><p className="font-bold text-[#2F6F9C]">Link individual</p><p className="mt-1 truncate text-[#6B7280]">{credential.portalUrl}</p><p className="mt-3 font-bold text-[#2F6F9C]">Código de acesso</p><p className="mt-1 font-mono font-bold tracking-wider text-[#111111]">{credential.accessCode}</p></div><button type="button" onClick={() => void copy(`Link: ${credential.portalUrl}\nCódigo: ${credential.accessCode}`)} className="inline-flex items-center justify-center gap-2 self-start rounded-lg border border-[#DDE3E8] px-3 py-2 font-bold hover:bg-[#F5F7F9]"><Copy className="h-3.5 w-3.5" />Copiar</button></div>}</div>; })}</div></section>;
+};
+
+
+```
+
+## Autenticação e sessões
+
+**Arquivo:** `api/_lib/portalAuth.ts`
+
+
+```ts
+
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import argon2 from 'argon2';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getAdminClient } from './supabaseAdmin.js';
+
+export const PORTAL_SESSION_COOKIE = 'studiodesk_portal_session';
+export const PORTAL_CSRF_COOKIE = 'studiodesk_portal_csrf';
+const SESSION_TTL_SECONDS = 60 * 60 * 12;
+
+type CookieOptions = { httpOnly?: boolean; maxAge?: number };
+export type PortalScope = {
+  sessionId: string;
+  accessId: string;
+  workspaceId: string;
+  projectId: string;
+  clientId: string;
+  clientName: string;
+  clientCompany: string;
+};
+
+function parseCookies(request: Request): Record<string, string> {
+  return Object.fromEntries((request.headers.get('cookie') || '').split(';').map(part => {
+    const index = part.indexOf('=');
+    if (index < 0) return ['', ''];
+    return [part.slice(0, index).trim(), decodeURIComponent(part.slice(index + 1).trim())];
+  }).filter(([key]) => key));
+}
+
+function cookie(name: string, value: string, options: CookieOptions = {}): string {
+  const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'Secure', 'SameSite=Lax'];
+  if (options.httpOnly) parts.push('HttpOnly');
+  if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
+  return parts.join('; ');
+}
+
+export function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+export function newToken(bytes = 32): string { return randomBytes(bytes).toString('base64url'); }
+function accessSecret(): string {
+  const secret = process.env.PORTAL_ACCESS_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!secret) throw new Error('PORTAL_ACCESS_SECRET não configurado.');
+  return secret;
+}
+export function createPortalAccessKey(accessId: string): string {
+  const encodedId = Buffer.from(accessId).toString('base64url');
+  const signature = createHmac('sha256', accessSecret()).update(accessId).digest('base64url');
+  return `p1_${encodedId}.${signature}`;
+}
+export function verifyPortalAccessKey(value: string): string | null {
+  const [prefix, signature] = value.split('.');
+  if (!prefix?.startsWith('p1_') || !signature) return null;
+  try {
+    const accessId = Buffer.from(prefix.slice(3), 'base64url').toString('utf8');
+    const expected = createHmac('sha256', accessSecret()).update(accessId).digest('base64url');
+    if (signature.length !== expected.length || !timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return null;
+    return accessId;
+  } catch { return null; }
+}
+export function setCookieHeaders(sessionToken: string, csrfToken: string): string[] {
+  return [cookie(PORTAL_SESSION_COOKIE, sessionToken, { httpOnly: true, maxAge: SESSION_TTL_SECONDS }), cookie(PORTAL_CSRF_COOKIE, csrfToken, { maxAge: SESSION_TTL_SECONDS })];
+}
+export function clearCookieHeaders(): string[] {
+  return [cookie(PORTAL_SESSION_COOKIE, '', { httpOnly: true, maxAge: 0 }), cookie(PORTAL_CSRF_COOKIE, '', { maxAge: 0 })];
+}
+export function csrfTokenFromRequest(request: Request): string | null {
+  const cookies = parseCookies(request);
+  const header = request.headers.get('x-csrf-token');
+  return header && cookies[PORTAL_CSRF_COOKIE] && header === cookies[PORTAL_CSRF_COOKIE] ? header : null;
+}
+
+export async function createPortalSession(admin: SupabaseClient, accessId: string, workspaceId: string) {
+  const sessionToken = newToken();
+  const csrfToken = newToken(24);
+  const { data, error } = await admin.from('client_portal_sessions').insert({
+    workspace_id: workspaceId,
+    access_id: accessId,
+    token_hash: hashToken(sessionToken),
+    expires_at: new Date(Date.now() + SESSION_TTL_SECONDS * 1000).toISOString(),
+    last_seen_at: new Date().toISOString(),
+  }).select('id').single();
+  if (error) throw error;
+  return { sessionId: data.id as string, sessionToken, csrfToken };
+}
+
+export async function getPortalScope(request: Request, admin: SupabaseClient = getAdminClient()): Promise<PortalScope | null> {
+  const token = parseCookies(request)[PORTAL_SESSION_COOKIE];
+  if (!token) return null;
+  const { data: session, error: sessionError } = await admin.from('client_portal_sessions')
+    .select('id, workspace_id, access_id, expires_at, revoked_at')
+    .eq('token_hash', hashToken(token)).maybeSingle();
+  if (sessionError || !session || session.revoked_at || new Date(session.expires_at).getTime() <= Date.now()) return null;
+  const { data: access, error: accessError } = await admin.from('client_project_access')
+    .select('id, workspace_id, project_id, client_id, is_active')
+    .eq('id', session.access_id).eq('workspace_id', session.workspace_id).eq('is_active', true).maybeSingle();
+  if (accessError || !access) return null;
+  const { data: project, error: projectError } = await admin.from('projects')
+    .select('id, workspace_id, client_id').eq('id', access.project_id).eq('workspace_id', access.workspace_id).eq('client_id', access.client_id).maybeSingle();
+  if (projectError || !project) return null;
+  const { data: client, error: clientError } = await admin.from('clients')
+    .select('id, workspace_id, name, company').eq('id', access.client_id).eq('workspace_id', access.workspace_id).maybeSingle();
+  if (clientError || !client) return null;
+  await admin.from('client_portal_sessions').update({ last_seen_at: new Date().toISOString() }).eq('id', session.id).eq('workspace_id', session.workspace_id);
+  return {
+    sessionId: session.id,
+    accessId: access.id,
+    workspaceId: access.workspace_id,
+    projectId: access.project_id,
+    clientId: access.client_id,
+    clientName: client.name,
+    clientCompany: client.company,
+  };
+}
+
+export async function revokePortalSession(request: Request, admin: SupabaseClient = getAdminClient()) {
+  const token = parseCookies(request)[PORTAL_SESSION_COOKIE];
+  if (!token) return;
+  await admin.from('client_portal_sessions').update({ revoked_at: new Date().toISOString() }).eq('token_hash', hashToken(token));
+}
+
+export async function verifyPortalPassword(password: string, hash: string): Promise<boolean> {
+  try { return await argon2.verify(hash, password); } catch { return false; }
+}
+export async function hashPortalPassword(password: string): Promise<string> {
+  return argon2.hash(password, { type: argon2.argon2id });
+}
+
+
+```
+
+## Login
+
+**Arquivo:** `api/portal/login.ts`
+
+
+```ts
+
+import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { getClientIp, rateLimit, readJson as readBody, requireAllowedOrigin } from '../_lib/security.js';
+import { createPortalSession, setCookieHeaders, verifyPortalAccessKey, verifyPortalPassword } from '../_lib/portalAuth.js';
+type Body = { accessKey?: unknown; accessCode?: unknown };
+export default async function handler(request: any, response: any) {
+  const webRequest = toWebRequest(request);
+  if (request.method !== 'POST') return sendWebResponse(methodNotAllowed(['POST']), response);
+  const limited = rateLimit(webRequest, 12, 60_000); if (limited) return sendWebResponse(limited, response);
+  const originError = requireAllowedOrigin(webRequest); if (originError) return sendWebResponse(originError, response);
+  try {
+    const body = await readBody<Body>(webRequest);
+    const accessKey = typeof body.accessKey === 'string' ? body.accessKey.trim() : '';
+    const accessCode = typeof body.accessCode === 'string' ? body.accessCode.trim() : '';
+    const accessId = verifyPortalAccessKey(accessKey);
+    if (!accessId || accessCode.length < 1 || accessCode.length > 256) return sendWebResponse(json({ error: 'Link de acesso ou código inválido.' }, 400), response);
+    const admin = getAdminClient();
+    const bucketKey = `${getClientIp(webRequest)}:${accessId}`.slice(0, 512);
+    const distributedLimit = await admin.rpc('consume_client_portal_login_attempt', { p_bucket_key: bucketKey, p_limit: 8, p_window_seconds: 900 });
+    if (distributedLimit.error) {
+      const missing = distributedLimit.error.code === 'PGRST202' || /function .*consume_client_portal_login_attempt.*not found/i.test(distributedLimit.error.message || '');
+      return sendWebResponse(json({ error: missing ? 'Portal temporariamente indisponível: o rate limit distribuído ainda precisa ser habilitado no banco.' : 'Portal temporariamente indisponível: não foi possível validar a proteção contra tentativas de login.' }, 503), response);
+    }
+    if (!distributedLimit.error && distributedLimit.data === false) return sendWebResponse(json({ error: 'Muitas tentativas de login. Tente novamente mais tarde.' }, 429, { 'retry-after': '900' }), response);
+    const { data: access, error } = await admin.from('client_project_access')
+      .select('id, workspace_id, project_id, client_id, password_hash, is_active')
+      .eq('id', accessId).eq('is_active', true).maybeSingle();
+    if (error) throw error;
+    const valid = Boolean(access && await verifyPortalPassword(accessCode, access.password_hash));
+    if (!valid) return sendWebResponse(json({ error: 'Não foi possível validar esses dados de acesso.' }, 401), response);
+    const { sessionToken, csrfToken } = await createPortalSession(admin, access.id, access.workspace_id);
+    response.setHeader('Set-Cookie', setCookieHeaders(sessionToken, csrfToken));
+    return response.status(200).json({ ok: true, csrfToken });
+  } catch (error) {
+    console.error('POST /api/portal/login failed', error);
+    if (error instanceof SyntaxError) return sendWebResponse(json({ error: 'JSON inválido.' }, 400), response);
+    return sendWebResponse(json({ error: 'Não foi possível iniciar o Portal.' }, 500), response);
+  }
+}
+
+
+```
+
+## Gerenciamento de acessos
+
+**Arquivo:** `api/portal/access.ts`
+
+
+```ts
+
+import { authenticateRequest, getMembership } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { readJson, rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+import { createPortalAccessKey, hashPortalPassword, newToken } from '../_lib/portalAuth.js';
+type Body = { workspaceId?: unknown; projectId?: unknown; clientId?: unknown; accessId?: unknown };
+function isManager(role: string): boolean { return role === 'admin' || role === 'gestor'; }
+export default async function handler(request: any, response: any) {
+  const webRequest = toWebRequest(request);
+  if (!['GET', 'POST', 'DELETE'].includes(request.method)) return sendWebResponse(methodNotAllowed(['GET', 'POST', 'DELETE']), response);
+  const limited = rateLimit(webRequest, 30); if (limited) return sendWebResponse(limited, response);
+  const originError = requireAllowedOrigin(webRequest); if (originError) return sendWebResponse(originError, response);
+  try {
+    const { user, admin } = await authenticateRequest(webRequest);
+    const membership = await getMembership(admin, user.id);
+    if (!membership || !isManager(membership.role)) return sendWebResponse(json({ error: 'Apenas administradores e gestores podem gerenciar acessos do Portal.' }, 403), response);
+    if (request.method === 'GET') {
+      const clientId = new URL(webRequest.url).searchParams.get('clientId')?.trim() || '';
+      const projectId = new URL(webRequest.url).searchParams.get('projectId')?.trim() || '';
+      let query = admin.from('client_project_access').select('id,workspace_id,project_id,client_id,is_active,created_at,updated_at').eq('workspace_id', membership.workspace_id);
+      if (clientId) query = query.eq('client_id', clientId);
+      if (projectId) query = query.eq('project_id', projectId);
+      const { data, error } = await query.order('updated_at', { ascending: false }).limit(100);
+      if (error) throw error;
+      return sendWebResponse(json({ accesses: data || [] }), response);
+    }
+    const body = await readJson<Body>(webRequest);
+    const workspaceId = typeof body.workspaceId === 'string' ? body.workspaceId.trim() : membership.workspace_id;
+    if (workspaceId !== membership.workspace_id) return sendWebResponse(json({ error: 'Workspace não autorizado.' }, 403), response);
+    if (request.method === 'DELETE') {
+      const accessId = typeof body.accessId === 'string' ? body.accessId.trim() : '';
+      if (!accessId) return sendWebResponse(json({ error: 'accessId é obrigatório.' }, 400), response);
+      const { data: access, error: accessError } = await admin.from('client_project_access').select('id').eq('id', accessId).eq('workspace_id', workspaceId).maybeSingle();
+      if (accessError) throw accessError;
+      if (!access) return sendWebResponse(json({ error: 'Acesso não encontrado.' }, 404), response);
+      const { error } = await admin.from('client_project_access').update({ is_active: false, updated_at: new Date().toISOString() }).eq('id', accessId).eq('workspace_id', workspaceId);
+      if (error) throw error;
+      await admin.from('client_portal_sessions').update({ revoked_at: new Date().toISOString() }).eq('access_id', accessId).eq('workspace_id', workspaceId).is('revoked_at', null);
+      return sendWebResponse(json({ ok: true }), response);
+    }
+    const projectId = typeof body.projectId === 'string' ? body.projectId.trim() : '';
+    const clientId = typeof body.clientId === 'string' ? body.clientId.trim() : '';
+    if (!projectId || !clientId) return sendWebResponse(json({ error: 'Projeto e cliente são obrigatórios.' }, 400), response);
+    const [{ data: project, error: projectError }, { data: client, error: clientError }] = await Promise.all([
+      admin.from('projects').select('id,workspace_id,client_id').eq('id', projectId).eq('workspace_id', workspaceId).eq('client_id', clientId).maybeSingle(),
+      admin.from('clients').select('id,workspace_id').eq('id', clientId).eq('workspace_id', workspaceId).maybeSingle(),
+    ]);
+    if (projectError || clientError) throw projectError || clientError;
+    if (!project || !client) return sendWebResponse(json({ error: 'Projeto e cliente não formam um vínculo válido neste workspace.' }, 400), response);
+    const accessCode = newToken(12);
+    const passwordHash = await hashPortalPassword(accessCode);
+    const { data: access, error } = await admin.from('client_project_access').upsert({ workspace_id: workspaceId, project_id: projectId, client_id: clientId, password_hash: passwordHash, is_active: true, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id,project_id' }).select('id,workspace_id,project_id,client_id,is_active,created_at,updated_at').single();
+    if (error) throw error;
+    const accessKey = createPortalAccessKey(access.id);
+    const appUrl = (process.env.APP_URL || new URL(webRequest.url).origin).replace(/\/$/, '');
+    return sendWebResponse(json({ access, accessCode, portalUrl: `${appUrl}/portal?access=${encodeURIComponent(accessKey)}` }), response);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (/Token de autenticação ausente|Sessão inválida/.test(message)) return sendWebResponse(json({ error: 'Não autenticado.' }, 401), response);
+    if (message.includes('Payload muito grande') || message.includes('Corpo da solicitação') || error instanceof SyntaxError) return sendWebResponse(json({ error: 'Payload inválido.' }, 400), response);
+    console.error(`${request.method} /api/portal/access failed`, error);
+    return sendWebResponse(json({ error: 'Não foi possível atualizar o acesso do Portal.' }, 500), response);
+  }
+}
+
+
+```
+
+## Sessão e dados autorizados
+
+**Arquivo:** `api/portal/session.ts`
+
+
+```ts
+
+import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { getPortalScope } from '../_lib/portalAuth.js';
+
+async function loadData(request: Request) {
+  const admin = getAdminClient();
+  const scope = await getPortalScope(request, admin);
+  if (!scope) return json({ error: 'Sessão do Portal inválida ou expirada.' }, 401);
+  const [projectResult, columnsResult, tasksResult, approvalsResult, mediaResult] = await Promise.all([
+    admin.from('projects').select('id,title,description,status,column_id,progress,created_at').eq('workspace_id', scope.workspaceId).eq('id', scope.projectId).eq('client_id', scope.clientId).single(),
+    admin.from('kanban_columns').select('id,title,color,sort_order').eq('workspace_id', scope.workspaceId).order('sort_order'),
+    admin.from('tasks').select('id,title,project_id,deadline,priority,description,completed,completed_at,created_at').eq('workspace_id', scope.workspaceId).eq('project_id', scope.projectId).order('created_at', { ascending: true }).limit(500),
+    admin.from('approval_requests').select('id,title,description,project_id,category,created_at,due_date,status,priority,file_url,file_type,feedback_notes,rejection_reason,revision_notes,reviewed_at').eq('workspace_id', scope.workspaceId).eq('project_id', scope.projectId).eq('client_id', scope.clientId).order('created_at', { ascending: false }).limit(100),
+    admin.from('media_approvals').select('id,title,version,video_url,thumbnail_url,status').eq('workspace_id', scope.workspaceId).eq('project_id', scope.projectId).order('version', { ascending: false }).limit(100),
+  ]);
+  if (projectResult.error || columnsResult.error || tasksResult.error || approvalsResult.error || mediaResult.error) throw projectResult.error || columnsResult.error || tasksResult.error || approvalsResult.error || mediaResult.error;
+  const approvalIds = (approvalsResult.data || []).map(row => row.id);
+  const mediaIds = (mediaResult.data || []).map(row => row.id);
+  const commentsQueries = [];
+  if (approvalIds.length) commentsQueries.push(admin.from('approval_comments').select('id,approval_request_id,media_approval_id,author,author_role,comment_role,timestamp_value,timecode,text_value,content,resolved').eq('workspace_id', scope.workspaceId).in('approval_request_id', approvalIds).order('timestamp_value', { ascending: true }).limit(500));
+  if (mediaIds.length) commentsQueries.push(admin.from('approval_comments').select('id,approval_request_id,media_approval_id,author,author_role,comment_role,timestamp_value,timecode,text_value,content,resolved').eq('workspace_id', scope.workspaceId).in('media_approval_id', mediaIds).order('timestamp_value', { ascending: true }).limit(500));
+  const commentResults = await Promise.all(commentsQueries);
+  if (commentResults.some(result => result.error)) throw commentResults.find(result => result.error)?.error;
+  const comments = commentResults.flatMap(result => result.data || []);
+  return json({
+    scope: { projectId: scope.projectId, clientId: scope.clientId, clientName: scope.clientName, clientCompany: scope.clientCompany },
+    project: projectResult.data,
+    columns: (columnsResult.data || []).filter(column => column.id === projectResult.data.column_id),
+    tasks: tasksResult.data || [],
+    approvals: (approvalsResult.data || []).map(({ file_url, ...approval }) => ({ ...approval, has_file: Boolean(file_url) })),
+    mediaApprovals: (mediaResult.data || []).map(({ video_url, thumbnail_url, ...media }) => ({ ...media, has_video: Boolean(video_url), has_thumbnail: Boolean(thumbnail_url) })),
+    comments,
+  });
+}
+export default async function handler(request: any, response: any) {
+  const webRequest = toWebRequest(request);
+  if (request.method !== 'GET') return sendWebResponse(methodNotAllowed(['GET']), response);
+  try { return sendWebResponse(await loadData(webRequest), response); }
+  catch (error) { console.error('GET /api/portal/session failed', error); return sendWebResponse(json({ error: 'Não foi possível carregar os dados autorizados do Portal.' }, 500), response); }
+}
+
+
+```
+
+## Ações de aprovação
+
+**Arquivo:** `api/portal/approval-action.ts`
+
+
+```ts
+
+import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { csrfTokenFromRequest, getPortalScope } from '../_lib/portalAuth.js';
+import { readJson as readBody, rateLimit, requireAllowedOrigin } from '../_lib/security.js';
+
+type Body = { approvalId?: unknown; action?: unknown; comment?: unknown };
+const actions = new Set(['approve', 'reject', 'needs_revision', 'comment']);
+export default async function handler(request: any, response: any) {
+  const webRequest = toWebRequest(request);
+  if (request.method !== 'POST') return sendWebResponse(methodNotAllowed(['POST']), response);
+  const limited = rateLimit(webRequest, 30); if (limited) return sendWebResponse(limited, response);
+  const originError = requireAllowedOrigin(webRequest); if (originError) return sendWebResponse(originError, response);
+  if (!csrfTokenFromRequest(webRequest)) return sendWebResponse(json({ error: 'Validação CSRF inválida.' }, 403), response);
+  try {
+    const body = await readBody<Body>(webRequest);
+    const approvalId = typeof body.approvalId === 'string' ? body.approvalId.trim() : '';
+    const action = typeof body.action === 'string' ? body.action : '';
+    const comment = typeof body.comment === 'string' ? body.comment.trim() : '';
+    if (!approvalId || !actions.has(action) || comment.length > 4000) return sendWebResponse(json({ error: 'Ação ou comentário inválido.' }, 400), response);
+    const admin = getAdminClient();
+    const scope = await getPortalScope(webRequest, admin);
+    if (!scope) return sendWebResponse(json({ error: 'Sessão do Portal inválida ou expirada.' }, 401), response);
+    const { data: approval, error: approvalError } = await admin.from('approval_requests').select('id,status').eq('id', approvalId).eq('workspace_id', scope.workspaceId).eq('project_id', scope.projectId).eq('client_id', scope.clientId).maybeSingle();
+    if (approvalError) throw approvalError;
+    if (!approval) return sendWebResponse(json({ error: 'Solicitação não encontrada neste projeto.' }, 404), response);
+    if (approval.status === 'approved' || approval.status === 'rejected') {
+      return sendWebResponse(json({ error: 'Esta solicitação já foi finalizada e não aceita novas alterações.' }, 409), response);
+    }
+    const result = await admin.rpc('apply_client_portal_approval_action', {
+      p_workspace_id: scope.workspaceId,
+      p_project_id: scope.projectId,
+      p_client_id: scope.clientId,
+      p_approval_id: approvalId,
+      p_action: action,
+      p_comment: comment,
+      p_author: scope.clientName,
+    });
+    if (result.error) {
+      if (result.error.code === 'PGRST202') return sendWebResponse(json({ error: 'A central de aprovação está aguardando a migration transacional do Portal.' }, 503), response);
+      if (result.error.code === 'P0001' || result.error.code === 'P0002') return sendWebResponse(json({ error: 'A solicitação mudou de estado ou não pertence a este projeto.' }, 409), response);
+      throw result.error;
+    }
+    return sendWebResponse(json({ ok: true }), response);
+  } catch (error) { console.error('POST /api/portal/approval-action failed', error); return sendWebResponse(json({ error: 'Não foi possível registrar essa ação.' }, 500), response); }
+}
+
+
+```
+
+## Entrega de arquivos
+
+**Arquivo:** `api/portal/file.ts`
+
+
+```ts
+
+import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { getPortalScope } from '../_lib/portalAuth.js';
+import { isSafeStoragePath } from '../_lib/security.js';
+const BUCKET = 'studiodesk-files';
+export default async function handler(request: any, response: any) {
+  const webRequest = toWebRequest(request);
+  if (request.method !== 'GET') return sendWebResponse(methodNotAllowed(['GET']), response);
+  try {
+    const scope = await getPortalScope(webRequest, getAdminClient());
+    if (!scope) return sendWebResponse(json({ error: 'Sessão do Portal inválida ou expirada.' }, 401), response);
+    const approvalId = new URL(webRequest.url).searchParams.get('approvalId') || '';
+    const admin = getAdminClient();
+    const { data: approval, error } = await admin.from('approval_requests').select('file_url').eq('id', approvalId).eq('workspace_id', scope.workspaceId).eq('project_id', scope.projectId).eq('client_id', scope.clientId).maybeSingle();
+    if (error) throw error;
+    if (!approval?.file_url) return sendWebResponse(json({ error: 'Arquivo não encontrado.' }, 404), response);
+    const reference = approval.file_url as string;
+    if (reference.startsWith('storage://')) {
+      const raw = reference.slice('storage://'.length);
+      const separator = raw.indexOf('/');
+      const bucket = separator > 0 ? raw.slice(0, separator) : '';
+      const path = separator > 0 ? raw.slice(separator + 1) : '';
+      if (bucket !== BUCKET || !isSafeStoragePath(path, scope.workspaceId)) return sendWebResponse(json({ error: 'Arquivo não autorizado.' }, 403), response);
+      const signed = await admin.storage.from(bucket).createSignedUrl(path, 900);
+      if (signed.error || !signed.data?.signedUrl) return sendWebResponse(json({ error: 'Não foi possível gerar o acesso ao arquivo.' }, 502), response);
+      return response.redirect(302, signed.data.signedUrl);
+    }
+    if (!/^https:\/\//i.test(reference)) return sendWebResponse(json({ error: 'Arquivo não autorizado.' }, 403), response);
+    const configuredUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '';
+    const trustedHost = configuredUrl ? new URL(configuredUrl).host : '';
+    const directUrl = new URL(reference);
+    if (!trustedHost || directUrl.host !== trustedHost || !directUrl.pathname.includes('/storage/v1/object/')) {
+      return sendWebResponse(json({ error: 'Arquivo não autorizado.' }, 403), response);
+    }
+    return response.redirect(302, directUrl.toString());
+  } catch (error) { console.error('GET /api/portal/file failed', error); return sendWebResponse(json({ error: 'Não foi possível abrir o arquivo.' }, 500), response); }
+}
+
+
+```
+
+## Logout
+
+**Arquivo:** `api/portal/logout.ts`
+
+
+```ts
+
+import { getAdminClient } from '../_lib/supabaseAdmin.js';
+import { json, methodNotAllowed, sendWebResponse, toWebRequest } from '../_lib/http.js';
+import { clearCookieHeaders, csrfTokenFromRequest, revokePortalSession } from '../_lib/portalAuth.js';
+import { requireAllowedOrigin } from '../_lib/security.js';
+export default async function handler(request: any, response: any) {
+  const webRequest = toWebRequest(request);
+  if (request.method !== 'POST') return sendWebResponse(methodNotAllowed(['POST']), response);
+  const originError = requireAllowedOrigin(webRequest); if (originError) return sendWebResponse(originError, response);
+  if (!csrfTokenFromRequest(webRequest)) return sendWebResponse(json({ error: 'Validação CSRF inválida.' }, 403), response);
+  try { await revokePortalSession(webRequest, getAdminClient()); response.setHeader('Set-Cookie', clearCookieHeaders()); return response.status(200).json({ ok: true }); }
+  catch (error) { console.error('POST /api/portal/logout failed', error); return sendWebResponse(json({ error: 'Não foi possível encerrar a sessão.' }, 500), response); }
+}
+
+
+```
+
+## Segurança geral
+
+**Arquivo:** `api/_lib/security.ts`
+
+
+```ts
+
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { json } from './http.js';
+
+const MAX_JSON_BYTES = 64 * 1024;
+const MAX_STORAGE_PATH = 1024;
+const requestBuckets = new Map<string, { count: number; resetAt: number }>();
+
+export function getClientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  return forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+}
+
+/** Best-effort per-instance limiter. Persistent limits belong in Supabase/Upstash/etc. */
+export function rateLimit(request: Request, limit = 60, windowMs = 60_000): Response | null {
+  const now = Date.now();
+  const key = `${getClientIp(request)}:${new URL(request.url).pathname}`;
+  const current = requestBuckets.get(key);
+  if (!current || current.resetAt <= now) {
+    requestBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return null;
+  }
+  current.count += 1;
+  if (current.count > limit) {
+    return json({ error: 'Muitas solicitações. Tente novamente em instantes.' }, 429, {
+      'retry-after': String(Math.max(1, Math.ceil((current.resetAt - now) / 1000))),
+    });
+  }
+  return null;
+}
+
+export function isAllowedOrigin(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return true;
+
+  const allowed = (process.env.APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || '')
+    .split(',')
+    .map(value => value.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  if (allowed.length === 0) {
+    // Same-origin requests normally omit Origin for GETs. For state-changing browser
+    // requests, require an explicit configured origin in production.
+    return process.env.VERCEL_ENV !== 'production';
+  }
+
+  return allowed.includes(origin.replace(/\/$/, ''));
+}
+
+export function requireAllowedOrigin(request: Request): Response | null {
+  if (!isAllowedOrigin(request)) {
+    return json({ error: 'Origem da solicitação não autorizada.' }, 403);
+  }
+  return null;
+}
+
+export async function readJson<T>(request: Request): Promise<T> {
+  const contentLength = Number(request.headers.get('content-length') || 0);
+  if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BYTES) {
+    throw new Error('Payload muito grande.');
+  }
+
+  const text = await request.text();
+  if (new TextEncoder().encode(text).byteLength > MAX_JSON_BYTES) {
+    throw new Error('Payload muito grande.');
+  }
+
+  if (!text.trim()) throw new Error('Corpo da solicitação ausente.');
+  return JSON.parse(text) as T;
+}
+
+export function isSafeStoragePath(path: string, workspaceId: string): boolean {
+  if (!path || path.length > MAX_STORAGE_PATH) return false;
+  const normalized = path.replace(/^\/+/, '');
+  const segments = normalized.split('/');
+  return segments.length >= 2 &&
+    segments[0] === workspaceId &&
+    segments.every(segment => segment.length > 0 && segment !== '.' && segment !== '..');
+}
+
+export function verifyHmacSignature(payload: string, signature: string, secret: string): boolean {
+  if (!signature || !secret) return false;
+  const expected = createHmac('sha256', secret).update(payload).digest('hex');
+  const provided = signature.replace(/^sha256=/i, '').trim();
+  if (provided.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+export function isFreshWebhookTimestamp(value: string, maxAgeSeconds = 300): boolean {
+  const timestamp = Number(value);
+  return Number.isInteger(timestamp) && Math.abs(Math.floor(Date.now() / 1000) - timestamp) <= maxAgeSeconds;
+}
+
+
+```
+
+## Migration proposta — rate limit e atomicidade
+
+**Arquivo:** `supabase/PROPOSTA-MIGRATION-PORTAL-ATOMICIDADE.sql`
+
+
+```sql
+
+-- NÃO EXECUTAR SEM APROVAÇÃO.
+-- Esta migration habilita as duas proteções exigidas pelo Portal:
+-- 1) rate limit compartilhado entre instâncias serverless;
+-- 2) mudança de status e comentário de aprovação na mesma transação.
+
+create table if not exists public.client_portal_login_rate_limits (
+  bucket_key text primary key,
+  window_started_at timestamptz not null default now(),
+  attempts integer not null default 0 check (attempts >= 0),
+  blocked_until timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.client_portal_login_rate_limits enable row level security;
+revoke all on table public.client_portal_login_rate_limits from public, anon, authenticated;
+
+create or replace function public.consume_client_portal_login_attempt(
+  p_bucket_key text,
+  p_limit integer default 8,
+  p_window_seconds integer default 900
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_row public.client_portal_login_rate_limits;
+  now_value timestamptz := now();
+begin
+  if p_bucket_key is null or length(trim(p_bucket_key)) = 0 or p_limit < 1 or p_window_seconds < 1 then
+    return false;
+  end if;
+
+  insert into public.client_portal_login_rate_limits(bucket_key, window_started_at, attempts, updated_at)
+  values (p_bucket_key, now_value, 1, now_value)
+  on conflict (bucket_key) do update set
+    window_started_at = case when public.client_portal_login_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= now_value then now_value else public.client_portal_login_rate_limits.window_started_at end,
+    attempts = case when public.client_portal_login_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= now_value then 1 else public.client_portal_login_rate_limits.attempts + 1 end,
+    blocked_until = case
+      when public.client_portal_login_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= now_value then null
+      when public.client_portal_login_rate_limits.attempts + 1 > p_limit then now_value + make_interval(secs => p_window_seconds)
+      else public.client_portal_login_rate_limits.blocked_until
+    end,
+    updated_at = now_value
+  returning * into current_row;
+
+  return current_row.attempts <= p_limit and (current_row.blocked_until is null or current_row.blocked_until <= now_value);
+end;
+$$;
+
+revoke all on function public.consume_client_portal_login_attempt(text, integer, integer) from public, anon, authenticated;
+grant execute on function public.consume_client_portal_login_attempt(text, integer, integer) to service_role;
+
+create or replace function public.apply_client_portal_approval_action(
+  p_workspace_id uuid,
+  p_project_id text,
+  p_client_id text,
+  p_approval_id uuid,
+  p_action text,
+  p_comment text,
+  p_author text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_request public.approval_requests%rowtype;
+  next_status text;
+  now_value timestamptz := now();
+begin
+  if p_action not in ('approve', 'reject', 'needs_revision', 'comment') then
+    raise exception 'invalid approval action' using errcode = '22023';
+  end if;
+  if coalesce(length(p_comment), 0) > 4000 then
+    raise exception 'comment too long' using errcode = '22023';
+  end if;
+
+  select * into current_request
+  from public.approval_requests
+  where id = p_approval_id
+    and workspace_id = p_workspace_id
+    and project_id = p_project_id
+    and client_id = p_client_id
+  for update;
+
+  if not found then raise exception 'approval request not found' using errcode = 'P0002'; end if;
+  if current_request.status in ('approved', 'rejected') then raise exception 'approval request already finalized' using errcode = 'P0001'; end if;
+
+  if p_action <> 'comment' then
+    next_status := case p_action when 'approve' then 'approved' when 'reject' then 'rejected' else 'needs_revision' end;
+    update public.approval_requests
+    set status = next_status,
+        reviewed_at = now_value,
+        reviewed_by = p_author,
+        feedback_notes = case when p_action = 'approve' then nullif(p_comment, '') else feedback_notes end,
+        rejection_reason = case when p_action = 'reject' then nullif(p_comment, '') else rejection_reason end,
+        revision_notes = case when p_action = 'needs_revision' then nullif(p_comment, '') else revision_notes end
+    where id = p_approval_id;
+  end if;
+
+  if coalesce(length(trim(p_comment)), 0) > 0 or p_action = 'comment' then
+    insert into public.approval_comments (
+      id, workspace_id, approval_request_id, author, author_role, comment_role,
+      timestamp_value, text_value, content, resolved
+    ) values (
+      gen_random_uuid(), p_workspace_id, p_approval_id, p_author, 'cliente', 'cliente',
+      now_value, p_comment, p_comment, false
+    );
+  end if;
+end;
+$$;
+
+revoke all on function public.apply_client_portal_approval_action(uuid, text, text, uuid, text, text, text) from public, anon, authenticated;
+grant execute on function public.apply_client_portal_approval_action(uuid, text, text, uuid, text, text, text) to service_role;
+
+
+```
+
+## Migration proposta — rate limit isolado
+
+**Arquivo:** `supabase/PROPOSTA-MIGRATION-PORTAL-RATE-LIMIT.sql`
+
+
+```sql
+
+-- NÃO EXECUTAR SEM APROVAÇÃO.
+-- Necessária para substituir o limitador apenas em memória por um limite
+-- compartilhado entre instâncias serverless da Vercel.
+
+create table if not exists public.client_portal_login_rate_limits (
+  bucket_key text primary key,
+  window_started_at timestamptz not null default now(),
+  attempts integer not null default 0 check (attempts >= 0),
+  blocked_until timestamptz,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.client_portal_login_rate_limits enable row level security;
+revoke all on table public.client_portal_login_rate_limits from anon, authenticated;
+
+create or replace function public.consume_client_portal_login_attempt(
+  p_bucket_key text,
+  p_limit integer default 8,
+  p_window_seconds integer default 900
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_row public.client_portal_login_rate_limits;
+  now_value timestamptz := now();
+  allowed boolean;
+begin
+  if p_bucket_key is null or length(trim(p_bucket_key)) = 0 then
+    return false;
+  end if;
+
+  insert into public.client_portal_login_rate_limits(bucket_key, window_started_at, attempts, blocked_until, updated_at)
+  values (p_bucket_key, now_value, 1, null, now_value)
+  on conflict (bucket_key) do update set
+    window_started_at = case
+      when public.client_portal_login_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= now_value
+      then now_value else public.client_portal_login_rate_limits.window_started_at end,
+    attempts = case
+      when public.client_portal_login_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= now_value
+      then 1 else public.client_portal_login_rate_limits.attempts + 1 end,
+    blocked_until = case
+      when public.client_portal_login_rate_limits.window_started_at + make_interval(secs => p_window_seconds) <= now_value
+      then null
+      when public.client_portal_login_rate_limits.attempts + 1 > p_limit
+      then now_value + make_interval(secs => p_window_seconds)
+      else public.client_portal_login_rate_limits.blocked_until end,
+    updated_at = now_value
+  returning * into current_row;
+
+  allowed := current_row.attempts <= p_limit and (current_row.blocked_until is null or current_row.blocked_until <= now_value);
+  return allowed;
+end;
+$$;
+
+revoke all on function public.consume_client_portal_login_attempt(text, integer, integer) from public, anon, authenticated;
+grant execute on function public.consume_client_portal_login_attempt(text, integer, integer) to service_role;
+
+
+```

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Mail, Phone, Globe, MessageSquare, Plus, ArrowLeft, Edit, Send, Briefcase } from 'lucide-react';
 import { ClientModal } from './ClientModal';
+import { PortalAccessManager } from './PortalAccessManager';
 
 interface ClientProfileViewProps {
   onOpenNewProjectForClient?: (clientId: string) => void;
@@ -161,6 +162,10 @@ export const ClientProfileView: React.FC<ClientProfileViewProps> = ({ onOpenNewP
           ))}
         </div>
       </div>
+
+      {(user?.role === 'admin' || user?.role === 'gestor') && (
+        <PortalAccessManager clientId={client.id} projects={clientProjects} />
+      )}
 
       {/* TAB CONTENT: VISÃO GERAL */}
       {activeTab === 'geral' && (
