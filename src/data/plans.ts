@@ -129,12 +129,18 @@ export const PLANS_CONFIG: Record<string, PlanDetails> = {
 
 export const PLANS_LIST = Object.values(PLANS_CONFIG);
 
+export const normalizePlan = (plan: PlanType | string | null | undefined): PlanType => {
+  if (plan === 'individual') return 'solo';
+  return plan === 'solo' || plan === 'studio' || plan === 'empresa' || plan === 'agencia'
+    ? plan
+    : 'solo';
+};
+
 export const TEAM_ENABLED_PLANS = new Set<PlanType>(['studio', 'empresa', 'agencia']);
 
 export const planAllowsTeam = (plan: PlanType | string): boolean =>
   TEAM_ENABLED_PLANS.has(plan as PlanType);
 
 export const getPlanDetails = (plan: PlanType | string): PlanDetails => {
-  if (plan === 'individual') return PLANS_CONFIG.solo;
-  return PLANS_CONFIG[plan] || PLANS_CONFIG.studio;
+  return PLANS_CONFIG[normalizePlan(plan)];
 };

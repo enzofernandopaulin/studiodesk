@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import type { PlanType } from '../../types';
 import { Logo } from '../common/Logo';
 import { 
   ArrowRight, 
@@ -21,10 +22,11 @@ import {
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
-  const { setCurrentView } = useApp();
+  const { setCurrentView, setPlan } = useApp();
   const [activeTabPreview, setActiveTabPreview] = useState<'kanban' | 'leads' | 'aprovacao' | 'site'>('kanban');
 
-  const handleStartPlan = (_selectedPlan?: unknown) => {
+  const handleStartPlan = (selectedPlan: PlanType = 'solo') => {
+    void setPlan(selectedPlan);
     setCurrentView('auth');
   };
 

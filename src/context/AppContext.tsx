@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import type { Session } from '@supabase/supabase-js';
 import { ActiveView, UserProfile, PlanType, Lead, Client, Project, Task, KanbanColumn, TimelineEvent, Message, Communication, CalendarEvent, CalendarEventStatus, ApprovalRequest, ApprovalStatus, ApprovalComment, TeamMember, IntegrationItem } from '../types';
 import { DEFAULT_KANBAN_COLUMNS } from '../data/defaults';
-import { getPlanDetails } from '../data/plans';
+import { getPlanDetails, normalizePlan } from '../data/plans';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { loadProfile, loadWorkspace, loadWorkspacePatch } from '../lib/workspaceRepository';
 import type { WorkspaceState } from '../lib/workspaceRepository';
@@ -31,7 +31,7 @@ interface AppContextType {
   // User & Plan
   user: UserProfile;
   setUser: React.Dispatch<React.SetStateAction<UserProfile>>;
-  setPlan: (plan: PlanType) => void;
+  setPlan: (plan: PlanType) => Promise<void>;
   
   // Data lists
   leads: Lead[];
@@ -128,7 +128,7 @@ const EMPTY_USER: UserProfile = {
   email: '',
   avatar: '',
   role: 'admin',
-  plan: 'individual',
+  plan: 'solo',
   businessType: '',
   teamSize: '',
   objectives: [],
@@ -215,7 +215,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoadingMoreCurrentViewData, setIsLoadingMoreCurrentViewData] = useState(false);
   const loadingDataModulesRef = useRef<Set<DataModule>>(new Set());
 
-  const [user, setUserState] = useState<UserProfile>(EMPTY_USER);
+  const [user, setUserState] = useState<UserProfile>(() => ({
+    ...EMPTY_USER,
+    plan: normalizePlan(typeof window === 'undefined' ? undefined : sessionStorage.getItem('studiodesk_selected_plan')),
+  }));
   const setUser: React.Dispatch<React.SetStateAction<UserProfile>> = (update) => {
     setUserState(prev => {
       const candidate = typeof update === 'function' ? (update as (p: UserProfile) => UserProfile)(prev) : update;
@@ -278,7 +281,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ...prev,
         id: userId,
         ...profile,
-        plan: workspace.plan,
+        plan: normalizePlan(workspace.plan),
         avatar: avatarUrl ?? '',
       }));
 
@@ -341,7 +344,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loadedUserRef.current = null;
         setAuthUserId(null);
         setActiveWorkspaceId(null);
-        setUserState(EMPTY_USER);
+        setUserState({
+          ...EMPTY_USER,
+          plan: normalizePlan(sessionStorage.getItem('studiodesk_selected_plan')),
+        });
         setLeads([]);
         setClients([]);
         setProjects([]);
@@ -651,7 +657,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email,
       password,
       options: {
-        data: { name, company_name: companyName },
+        data: { name, company_name: companyName, plan: normalizePlan(user.plan) },
         emailRedirectTo: window.location.href.split('#')[0],
       },
     });
@@ -743,9 +749,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .then(() => setTimelineEvents(prev => [newEvt, ...prev]));
   };
 
-  const setPlan = (plan: PlanType) => {
-    const details = getPlanDetails(plan);
-    setUser(prev => ({ ...prev, plan }));
+  const setPlan = async (plan: PlanType) => {
+    const normalizedPlan = normalizePlan(plan);
+    const previousPlan = normalizePlan(user.plan);
+    const details = getPlanDetails(normalizedPlan);
+    sessionStorage.setItem('studiodesk_selected_plan', normalizedPlan);
+    setUser(prev => ({ ...prev, plan: normalizedPlan }));
+    if (authUserId) {
+      try {
+        await callServerApi('/api/workspaces', {
+          method: 'PUT',
+          body: JSON.stringify({ plan: normalizedPlan }),
+        });
+      } catch (error) {
+        sessionStorage.setItem('studiodesk_selected_plan', previousPlan);
+        setUser(prev => ({ ...prev, plan: previousPlan }));
+        throw error;
+      }
+    }
     addToast('info', `Plano ${details.name} selecionado`, `${details.icon} A escolha será confirmada ao concluir a configuração.`);
   };
 

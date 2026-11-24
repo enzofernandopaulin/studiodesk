@@ -255,7 +255,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMobileMenu, isMobileMenuOp
                     {user.role.toUpperCase()}
                   </span>
                   <span className="text-[10px] text-[#6B7280]">
-                    {plan === 'empresa' ? 'Plano Empresa' : 'Plano Individual'}
+                    Plano {getPlanDetails(plan).name}
                   </span>
                 </div>
               </div>

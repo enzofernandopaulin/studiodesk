@@ -37,7 +37,7 @@ export default async function handler(request: any, response: any) {
       });
     }
 
-    const body = request.method === 'GET' ? {} : await readJson<{ name?: unknown; workspaceId?: unknown }>(webRequest);
+    const body = request.method === 'GET' ? {} : await readJson<{ name?: unknown; workspaceId?: unknown; plan?: unknown }>(webRequest);
     if (request.method === 'POST') {
       const name = typeof body.name === 'string' ? body.name.trim().slice(0, 120) : '';
       if (!name) return response.status(400).json({ error: 'Informe o nome do novo workspace.' });
@@ -57,7 +57,38 @@ export default async function handler(request: any, response: any) {
       return response.status(200).json({ selected: true });
     }
 
-    response.setHeader('Allow', 'GET, POST, PATCH');
+    if (request.method === 'PUT') {
+      const requestedPlan = typeof body.plan === 'string' ? body.plan : '';
+      const plan = requestedPlan === 'individual' ? 'solo' : requestedPlan;
+      if (!['solo', 'studio', 'empresa', 'agencia'].includes(plan)) {
+        return response.status(400).json({ error: 'Plano inválido.' });
+      }
+
+      const { data: profile, error: profileError } = await admin
+        .from('profiles').select('workspace_id').eq('id', user.id).maybeSingle();
+      if (profileError || !profile?.workspace_id) throw profileError || new Error('Workspace ativo não encontrado.');
+
+      const { data: membership, error: membershipError } = await admin
+        .from('workspace_members').select('role').eq('workspace_id', profile.workspace_id).eq('user_id', user.id).maybeSingle();
+      if (membershipError) throw membershipError;
+      if (membership?.role !== 'admin') return response.status(403).json({ error: 'Somente o administrador pode definir o plano.' });
+
+      const { data: workspace, error: workspaceError } = await admin
+        .from('workspaces').select('owner_id').eq('id', profile.workspace_id).single();
+      if (workspaceError) throw workspaceError;
+      if (workspace.owner_id !== user.id) return response.status(403).json({ error: 'Somente o proprietário pode definir o plano.' });
+
+      const { error: updateWorkspaceError } = await admin.from('workspaces')
+        .update({ plan, updated_at: new Date().toISOString() }).eq('id', profile.workspace_id);
+      if (updateWorkspaceError) throw updateWorkspaceError;
+      const { error: updateProfileError } = await admin.from('profiles')
+        .update({ plan, updated_at: new Date().toISOString() }).eq('id', user.id);
+      if (updateProfileError) throw updateProfileError;
+
+      return response.status(200).json({ plan });
+    }
+
+    response.setHeader('Allow', 'GET, POST, PATCH, PUT');
     return response.status(405).json({ error: 'Método não permitido.' });
   } catch (error) {
     console.error('/api/workspaces failed', error);

@@ -2,6 +2,15 @@ import { getAdminClient } from '../_lib/supabaseAdmin.js';
 import { sendWebResponse, toWebRequest } from '../_lib/http.js';
 import { rateLimit, requireAllowedOrigin } from '../_lib/security.js';
 
+const normalizePlan = (value: unknown): string => {
+  if (value === 'individual') return 'solo';
+  return value === 'solo' || value === 'studio' || value === 'empresa' || value === 'agencia'
+    ? value
+    : 'solo';
+};
+const isKnownPlan = (value: unknown): boolean =>
+  value === 'individual' || value === 'solo' || value === 'studio' || value === 'empresa' || value === 'agencia';
+
 export default async function handler(request: any, response: any) {
   response.setHeader('Cache-Control', 'no-store');
   const webRequest = toWebRequest(request);
@@ -18,7 +27,7 @@ export default async function handler(request: any, response: any) {
     if (authError || !auth.user) return response.status(401).json({ error: 'Sessão inválida.' });
 
     const { data: profile, error: profileError } = await admin.from('profiles')
-      .select('id,workspace_id,plan,name,email,company_name,role').eq('id', auth.user.id).maybeSingle();
+      .select('id,workspace_id,plan,name,email,company_name,role,business_type').eq('id', auth.user.id).maybeSingle();
     if (profileError) throw profileError;
 
     const { data: memberships, error: membershipsError } = await admin.from('workspace_members')
@@ -28,7 +37,7 @@ export default async function handler(request: any, response: any) {
     let membership = (memberships || [])[0] || null;
     if (!membership) {
       const workspaceName = String(auth.user.user_metadata?.company_name || 'Meu Workspace').trim().slice(0, 120) || 'Meu Workspace';
-      const fallbackPlan = profile?.plan || 'individual';
+      const fallbackPlan = normalizePlan(profile?.plan || auth.user.user_metadata?.plan);
       const { data: workspace, error: workspaceError } = await admin.from('workspaces')
         .insert({ name: workspaceName, owner_id: auth.user.id, plan: fallbackPlan }).select('id').single();
       if (workspaceError) throw workspaceError;
@@ -46,7 +55,7 @@ export default async function handler(request: any, response: any) {
     if (activeMembership.error) throw activeMembership.error;
     const active = activeMembership.data || membership;
     const { data: workspace, error: workspaceError } = await admin.from('workspaces')
-      .select('name').eq('id', active.workspace_id).single();
+      .select('name,plan,owner_id').eq('id', active.workspace_id).single();
     if (workspaceError) throw workspaceError;
 
     if (!profile) {
@@ -57,7 +66,7 @@ export default async function handler(request: any, response: any) {
         email: auth.user.email || '',
         company_name: workspace.name,
         role: active.role,
-        plan: 'individual',
+        plan: normalizePlan(auth.user.user_metadata?.plan),
       });
       if (insertError) throw insertError;
     } else if (profile.workspace_id !== active.workspace_id || profile.company_name !== workspace.name || profile.role !== active.role) {
@@ -68,6 +77,20 @@ export default async function handler(request: any, response: any) {
         updated_at: new Date().toISOString(),
       }).eq('id', auth.user.id);
       if (updateError) throw updateError;
+    }
+
+    // Durante o primeiro acesso, a escolha feita na landing/cadastro prevalece
+    // sobre o valor padrão legado. Depois do onboarding, o workspace é canônico.
+    const metadataPlan = auth.user.user_metadata?.plan;
+    const selectedPlan = normalizePlan(metadataPlan);
+    const isFirstAccess = !profile?.business_type;
+    if (isFirstAccess && isKnownPlan(metadataPlan) && workspace.owner_id === auth.user.id && workspace.plan !== selectedPlan) {
+      const { error: workspacePlanError } = await admin.from('workspaces')
+        .update({ plan: selectedPlan, updated_at: new Date().toISOString() }).eq('id', active.workspace_id);
+      if (workspacePlanError) throw workspacePlanError;
+      const { error: profilePlanError } = await admin.from('profiles')
+        .update({ plan: selectedPlan, updated_at: new Date().toISOString() }).eq('id', auth.user.id);
+      if (profilePlanError) throw profilePlanError;
     }
 
     return response.status(200).json({ ready: true, workspaceId: active.workspace_id });

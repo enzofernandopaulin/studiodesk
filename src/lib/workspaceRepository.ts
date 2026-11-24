@@ -5,6 +5,7 @@ import {
   IntegrationItem, ApprovalComment
 } from '../types';
 import type { RealtimeTable } from './realtimeRepository';
+import { normalizePlan } from '../data/plans';
 
 export interface WorkspaceState {
   plan: PlanType;
@@ -106,7 +107,7 @@ export async function loadWorkspace(workspaceId: string): Promise<WorkspaceState
   const commentsRows = comments.data ?? [];
 
   return {
-    plan: (workspace.data?.plan || 'individual') as PlanType,
+    plan: normalizePlan(workspace.data?.plan),
     leads: (leads.data ?? []).map(mapLead),
     clients: (clients.data ?? []).map(mapClient),
     kanbanColumns: (columns.data ?? []).map(c => ({ id:c.id,title:c.title,color:c.color,order:c.sort_order })),
@@ -226,7 +227,7 @@ export async function loadProfile(userId: string): Promise<Partial<UserProfile> 
   const { data, error } = await supabase.from('profiles').select('name,email,role,plan,business_type,team_size,objectives,template,company_name').eq('id', userId).maybeSingle();
   if (error) throw error;
   if (!data) return null;
-  return { id:userId,name:data.name,email:data.email,role:data.role,plan:data.plan,businessType:data.business_type,teamSize:data.team_size,objectives:data.objectives ?? [],template:data.template,companyName:data.company_name };
+  return { id:userId,name:data.name,email:data.email,role:data.role,plan:normalizePlan(data.plan),businessType:data.business_type,teamSize:data.team_size,objectives:data.objectives ?? [],template:data.template,companyName:data.company_name };
 }
 
 export async function saveProfile(user: UserProfile): Promise<void> {

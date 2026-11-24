@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Logo } from '../common/Logo';
 import { Check, ArrowRight } from 'lucide-react';
@@ -6,11 +6,19 @@ import { PlanType } from '../../types';
 import { PLANS_LIST } from '../../data/plans';
 
 export const ProfileSelection: React.FC = () => {
-  const { setPlan, setCurrentView } = useApp();
+  const { setPlan, setCurrentView, addToast } = useApp();
+  const [selectedPlan, setSelectedPlan] = useState<PlanType | null>(null);
 
-  const handleSelect = (selectedPlan: PlanType) => {
-    setPlan(selectedPlan);
-    setCurrentView('onboarding');
+  const handleSelect = async (plan: PlanType) => {
+    setSelectedPlan(plan);
+    try {
+      await setPlan(plan);
+      setCurrentView('onboarding');
+    } catch (error) {
+      addToast('error', 'Plano não salvo', error instanceof Error ? error.message : 'Tente novamente.');
+    } finally {
+      setSelectedPlan(null);
+    }
   };
 
   return (
@@ -31,13 +39,14 @@ export const ProfileSelection: React.FC = () => {
             return (
               <div
                 key={p.id}
-                onClick={() => handleSelect(p.id)}
+                onClick={() => { if (!selectedPlan) void handleSelect(p.id); }}
                 className={`p-6 rounded-3xl border-2 transition-all cursor-pointer hover:shadow-xl group flex flex-col justify-between space-y-5 ${
                   p.id === 'studio'
                     ? 'bg-[#111111] text-white border-[#66acd7] ring-2 ring-[#66acd7]/30 relative'
                     : 'bg-white text-[#111111] border-[#DDE3E8] hover:border-[#66acd7]'
                 }`}
                 id={`profile-card-${p.id}`}
+                aria-busy={selectedPlan === p.id}
               >
                 {p.popular && (
                   <div className="absolute top-3 right-3">
